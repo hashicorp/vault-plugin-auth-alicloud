@@ -31,14 +31,6 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/fullsailor/pkcs7"
-
-[[constraint]]
-  name = "github.com/go-errors/errors"
-  version = "1.0.0"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/hashicorp/errwrap"
 
 [[constraint]]
@@ -47,11 +39,15 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/hashicorp/go-hclog"
+
+[[constraint]]
+  branch = "master"
   name = "github.com/hashicorp/go-uuid"
 
 [[constraint]]
-  branch = "alibaba-auth-method"
   name = "github.com/hashicorp/vault"
+  version = "0.10.3"
 
 [[constraint]]
   name = "github.com/patrickmn/go-cache"
