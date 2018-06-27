@@ -38,18 +38,6 @@
   revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/fullsailor/pkcs7"
-  packages = ["."]
-  revision = "8306686428a5fe132eac8cb7c4848af725098bd4"
-
-[[projects]]
-  name = "github.com/go-errors/errors"
-  packages = ["."]
-  revision = "3afebba5a48dbc89b574d890b6b34d9ee10b4785"
-  version = "v1.0.0"
-
-[[projects]]
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -154,16 +142,9 @@
   revision = "f40e974e75af4e271d97ce0fc917af5898ae7bda"
 
 [[projects]]
-  branch = "alibaba-auth-method"
   name = "github.com/hashicorp/vault"
   packages = [
     "api",
-    "builtin/credential/alibaba",
-    "builtin/credential/alibaba/common",
-    "builtin/credential/alibaba/ecsmethod",
-    "builtin/credential/alibaba/ecsmethod/blacklist",
-    "builtin/credential/alibaba/ecsmethod/whitelist",
-    "builtin/credential/alibaba/rammethod",
     "helper/certutil",
     "helper/compressutil",
     "helper/consts",
@@ -182,11 +163,14 @@
     "helper/wrapping",
     "logical",
     "logical/framework",
+    "logical/plugin",
+    "logical/plugin/pb",
     "physical",
     "physical/inmem",
     "version"
   ]
-  revision = "a67516b148d39dee3a1cf303b74e430a12b3d561"
+  revision = "533003e27840d9646cb4e7d23b3a113895da1dd0"
+  version = "v0.10.3"
 
 [[projects]]
   branch = "master"
@@ -347,6 +331,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e9cd1380e46b4b943f9b81e7c342516669963444ec021bf5b19b6570abef91ad"
+  inputs-digest = "8b291b38697704b18a722879cce95c2b9b1f85009aabacc27d788c474f551103"
   solver-name = "gps-cdcl"
   solver-version = 1
