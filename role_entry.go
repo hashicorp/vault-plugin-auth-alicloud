@@ -4,7 +4,7 @@ import "time"
 
 // Struct to hold the information associated with a Vault role
 type RoleEntry struct {
-	BoundIamPrincipalARNs   []string      `json:"bound_iam_principal_arn_list"`
+	BoundRamPrincipalARNs   []string      `json:"bound_iam_principal_arn_list"`
 	ResolveAlibabaUniqueIDs bool          `json:"resolve_aws_unique_ids"`
 	TTL                     time.Duration `json:"ttl"`
 	MaxTTL                  time.Duration `json:"max_ttl"`
@@ -21,10 +21,10 @@ func (r *RoleEntry) ToResponseData() map[string]interface{} {
 		"period":   r.Period / time.Second,
 	}
 
-	if r.BoundIamPrincipalARNs == nil {
+	if r.BoundRamPrincipalARNs == nil {
 		responseData["bound_iam_principal_arn"] = []string{}
 	} else {
-		responseData["bound_iam_principal_arn"] =  r.BoundIamPrincipalARNs
+		responseData["bound_iam_principal_arn"] =  r.BoundRamPrincipalARNs
 	}
 
 	return responseData

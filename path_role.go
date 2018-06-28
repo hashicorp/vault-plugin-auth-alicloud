@@ -154,10 +154,10 @@ func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request
 	}
 
 	if boundIamPrincipalARNRaw, ok := data.GetOk("bound_ram_principal_arn"); ok {
-		roleEntry.BoundIamPrincipalARNs = boundIamPrincipalARNRaw.([]string)
+		roleEntry.BoundRamPrincipalARNs = boundIamPrincipalARNRaw.([]string)
 	}
 
-	if len(roleEntry.BoundIamPrincipalARNs) == 0 {
+	if len(roleEntry.BoundRamPrincipalARNs) == 0 {
 		return logical.ErrorResponse("at least be one bound parameter should be specified on the role"), nil
 	}
 
