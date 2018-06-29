@@ -16,28 +16,17 @@ func pathRole(b *backend) *framework.Path {
 		Pattern: "role/" + framework.GenericNameRegex("role"),
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
-				Type:        framework.TypeString,
-				Description: "Name of the role.",
+				Type: framework.TypeString,
+				Description: "The name of the role as it should appear in Vault.",
 			},
-			"bound_ram_principal_arn": {
-				Type: framework.TypeCommaStringSlice,
+			"arn": {
+				Type: framework.TypeString,
 				Description: `ARN of the RAM principals to bind to this role.`,
 			},
-			"resolve_ram_unique_ids": {
-				Type:    framework.TypeBool,
-				Default: true,
-				Description: `If set, resolve all Alibaba RAM ARNs into Alibaba's internal unique IDs.
-When an RAM entity (e.g., user, role, or instance profile) is deleted, then all references
-to it within the role will be invalidated, which prevents a new RAM entity from being created
-with the same name and matching the role's RAM binds. Once set, this cannot be unset.`,
-			},
-			"period": {
-				Type:    framework.TypeDurationSecond,
-				Default: 0,
-				Description: `
-If set, indicates that the token generated using this role should never expire.
-The token should be renewed within the duration specified by this value. At
-each renewal, the token's TTL will be set to the value of this parameter.`,
+			"policies": {
+				Type:        framework.TypeCommaStringSlice,
+				Default:     "default",
+				Description: "Policies to be set on tokens issued using this role.",
 			},
 			"ttl": {
 				Type:    framework.TypeDurationSecond,
@@ -50,10 +39,13 @@ to 0, in which case the value will fallback to the system/mount defaults.`,
 				Default:     0,
 				Description: "The maximum allowed lifetime of tokens issued using this role.",
 			},
-			"policies": {
-				Type:        framework.TypeCommaStringSlice,
-				Default:     "default",
-				Description: "Policies to be set on tokens issued using this role.",
+			"period": {
+				Type:    framework.TypeDurationSecond,
+				Default: 0,
+				Description: `
+If set, indicates that the token generated using this role should never expire.
+The token should be renewed within the duration specified by this value. At
+each renewal, the token's TTL will be set to the value of this parameter.`,
 			},
 		},
 		ExistenceCheck: b.pathRoleExistenceCheck,
@@ -130,7 +122,8 @@ func (b *backend) pathRoleRead(ctx context.Context, req *logical.Request, data *
 }
 
 func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := strings.ToLower(data.Get("role").(string))
+
+	roleName := data.Get("role").(string)
 	if roleName == "" {
 		return logical.ErrorResponse("missing role"), nil
 	}
@@ -140,81 +133,48 @@ func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request
 		return nil, err
 	}
 	if roleEntry == nil {
-		roleEntry = &RoleEntry{
-			TTL: b.System().DefaultLeaseTTL(),
-			MaxTTL:b.System().MaxLeaseTTL(),
-		}
+		roleEntry = &RoleEntry{}
 	}
 
-	if resolveAWSUniqueIDsRaw, ok := data.GetOk("resolve_ram_unique_ids"); ok {
-		if roleEntry.ResolveAlibabaUniqueIDs && !resolveAWSUniqueIDsRaw.(bool) {
-			return logical.ErrorResponse("changing resolve_ram_unique_ids from true to false is not allowed"), nil
-		}
-		roleEntry.ResolveAlibabaUniqueIDs = resolveAWSUniqueIDsRaw.(bool)
+	arn := data.Get("arn").(string)
+	if arn == "" {
+		return logical.ErrorResponse("missing arn"), nil
 	}
 
-	if boundIamPrincipalARNRaw, ok := data.GetOk("bound_ram_principal_arn"); ok {
-		roleEntry.BoundRamPrincipalARNs = boundIamPrincipalARNRaw.([]string)
+	entity, err := parseRamArn(arn)
+	if err != nil {
+		return logical.ErrorResponse("unable to parse arn: " + arn + " due to " + err.Error()), nil
+	}
+	if entity.Type != "role" {
+		return logical.ErrorResponse("only role arns are currently supported"), nil
 	}
 
-	if len(roleEntry.BoundRamPrincipalARNs) == 0 {
-		return logical.ErrorResponse("at least be one bound parameter should be specified on the role"), nil
+	if policies, ok := data.GetOk("policies"); ok {
+		roleEntry.Policies = policyutil.ParsePolicies(policies)
+	}
+	if len(roleEntry.Policies) == 0 {
+		return logical.ErrorResponse("at least one valid policy must be provided"), nil
 	}
 
-	if policiesRaw, ok := data.GetOk("policies"); ok {
-		roleEntry.Policies = policyutil.ParsePolicies(policiesRaw)
-	}
+	// These default to 0 and if 0 is passed to the core, it defaults to the system settings.
+	ttl := data.Get("ttl").(int)
+	roleEntry.TTL = time.Duration(ttl) * time.Second
 
-	var resp logical.Response
+	maxTTL := data.Get("maxTTL").(int)
+	roleEntry.MaxTTL = time.Duration(maxTTL) * time.Second
 
-	if ttlRaw, ok := data.GetOk("ttl"); ok {
-		ttl := time.Duration(ttlRaw.(int)) * time.Second
-		if ttl > roleEntry.TTL {
-			// intentionally retain the default ttl set earlier
-			resp.AddWarning(fmt.Sprintf("Given ttl of %d seconds greater than current mount/system default of %d seconds; ttl is capped", ttl/time.Second, roleEntry.TTL/time.Second))
-		} else {
-			if ttl < time.Duration(0) {
-				return logical.ErrorResponse("ttl cannot be negative"), nil
-			}
-			roleEntry.TTL = ttl
-		}
-	}
+	period := data.Get("period").(int)
+	roleEntry.Period = time.Duration(period) * time.Second
 
-	maxTTLInt, ok := data.GetOk("max_ttl")
-	if ok {
-		maxTTL := time.Duration(maxTTLInt.(int)) * time.Second
-		if maxTTL > roleEntry.MaxTTL {
-			// intentionally retain the default max ttl set earlier
-			resp.AddWarning(fmt.Sprintf("Given max_ttl of %d seconds greater than current mount/system default of %d seconds; max_ttl is capped", maxTTL/time.Second, roleEntry.MaxTTL/time.Second))
-		} else {
-			if maxTTL < time.Duration(0) {
-				return logical.ErrorResponse("max_ttl cannot be negative"), nil
-			}
-			roleEntry.MaxTTL = maxTTL
-		}
-	}
-
-	if roleEntry.MaxTTL != 0 && roleEntry.MaxTTL < roleEntry.TTL {
-		return logical.ErrorResponse("ttl should be shorter than max_ttl"), nil
-	}
-
-	if periodRaw, ok := data.GetOk("period"); ok {
-		roleEntry.Period = time.Second * time.Duration(periodRaw.(int))
-	}
-
-	if roleEntry.Period > b.System().MaxLeaseTTL() {
-		return logical.ErrorResponse(fmt.Sprintf("'period' of '%s' is greater than the backend's maximum lease TTL of '%s'", roleEntry.Period.String(), b.System().MaxLeaseTTL().String())), nil
+	// TODO may need additional logic regarding capping TTL's and the period at the system ones.
+	if ttl > maxTTL {
+		return logical.ErrorResponse(fmt.Sprintf("ttl of %d cannot be greater than max_ttl of %d", ttl, maxTTL)), nil
 	}
 
 	if err := b.roleMgr.Update(ctx, req.Storage, roleName, roleEntry); err != nil {
 		return nil, err
 	}
-
-	if len(resp.Warnings) == 0 {
-		return nil, nil
-	}
-
-	return &resp, nil
+	return nil, nil
 }
 
 const pathRoleSyn = `
