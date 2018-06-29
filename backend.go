@@ -33,8 +33,6 @@ type backend struct {
 
 	// Lock to make changes to any of the backend's configuration endpoints.
 	configMutex sync.RWMutex
-
-	resolveArnToUniqueIDFunc func(ctx context.Context, s logical.Storage, arn string) (string, error)
 }
 
 func Backend(conf *logical.BackendConfig) (*backend, error) {
