@@ -24,12 +24,11 @@
     "sdk/requests",
     "sdk/responses",
     "sdk/utils",
-    "services/ecs",
     "services/ram",
     "services/sts"
   ]
-  revision = "3e1d999dbb439a67b41027e3de430155c05656d4"
-  version = "1.21.0"
+  revision = "61403c78b5eb7b3360e31ec12aa8b03d14d735eb"
+  version = "1.21.1"
 
 [[projects]]
   branch = "master"
@@ -107,10 +106,9 @@
   revision = "7165ee14aff120ee3642aa2bcf2dea8eebef29c3"
 
 [[projects]]
-  branch = "master"
   name = "github.com/hashicorp/go-uuid"
   packages = ["."]
-  revision = "27454136f0364f2d44b1276c552d69105cf8c498"
+  revision = "64130c7a86d732268a38cb04cfbaf0cc987fda98"
 
 [[projects]]
   name = "github.com/hashicorp/go-version"
@@ -244,17 +242,18 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
   name = "golang.org/x/net"
   packages = [
     "context",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
-    "lex/httplex",
     "trace"
   ]
-  revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
+  revision = "4cb1c02c05b0e749b0365f61ae859a8e0cfceed9"
 
 [[projects]]
   name = "golang.org/x/sys"
@@ -292,7 +291,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "80063a038e333bbe006c878e4c5ce4c74d055498"
+  revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -306,13 +305,11 @@
     "credentials",
     "encoding",
     "encoding/proto",
+    "grpclb/grpc_lb_v1/messages",
     "grpclog",
     "health",
     "health/grpc_health_v1",
     "internal",
-    "internal/backoff",
-    "internal/channelz",
-    "internal/grpcrand",
     "keepalive",
     "metadata",
     "naming",
@@ -325,12 +322,11 @@
     "tap",
     "transport"
   ]
-  revision = "168a6198bcb0ef175f7dacec0b8691fc141dc9b8"
-  version = "v1.13.0"
+  revision = "d50734d1d6ca477a72646f3022216ec39639f4cd"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8b291b38697704b18a722879cce95c2b9b1f85009aabacc27d788c474f551103"
+  inputs-digest = "faf7212cb088677655374e05765fe84e4fd9c97ea29ea0adab94f5a222b9cd54"
   solver-name = "gps-cdcl"
   solver-version = 1
