@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"errors"
 )
 
 func pathConfigClient(b *backend) *framework.Path {
@@ -122,10 +123,16 @@ func (b *backend) pathConfigClientCreateUpdate(ctx context.Context, req *logical
 
 	if accessKeyStr, ok := data.GetOk("access_key"); ok {
 		configEntry.AccessKey = accessKeyStr.(string)
+	} else if req.Operation == logical.CreateOperation {
+		return nil, errors.New("access_key is required")
 	}
+
 	if secretKeyStr, ok := data.GetOk("secret_key"); ok {
 		configEntry.SecretKey = secretKeyStr.(string)
+	} else if req.Operation == logical.CreateOperation {
+		return nil, errors.New("secret_key is required")
 	}
+
 	if headerValStr, ok := data.GetOk("instance_identity_audience"); ok {
 		configEntry.InstanceIdentityAudience = headerValStr.(string)
 	}

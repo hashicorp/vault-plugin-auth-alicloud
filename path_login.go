@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -212,8 +213,16 @@ func (b *backend) getMatchingRole(ctx context.Context, s logical.Storage, roleId
 		return roleIfc.(ram.Role), nil
 	}
 
+	config, err := b.lockedClientConfigEntry(ctx, s)
+	if err != nil {
+		return ram.Role{}, err
+	}
+	if config == nil {
+		return ram.Role{}, errors.New("cannot retrieve role name because client access_key and secret_key are not configured")
+	}
+
 	// Nope, let's go find it!
-	client, err := b.getRAMClient(ctx, s)
+	client, err := getRAMClient(config)
 	if err != nil {
 		return ram.Role{}, err
 	}

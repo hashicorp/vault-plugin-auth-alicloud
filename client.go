@@ -1,59 +1,39 @@
 package ali
 
 import (
-	"context"
 	"errors"
-	"os"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
-	"github.com/hashicorp/vault/logical"
 )
 
-const (
-	EnvVarAccessKeyID     = "ALIBABA_ACCESS_KEY_ID"
-	EnvVarSecretAccessKey = "ALIBABA_SECRET_ACCESS_KEY"
-)
+// There's only one endpoint for RAM, yet its client demands that you have the endpoint
+// because it's reused for other things. It always uses an endpoint to go through its list
+// of endpoints in each region and pull out the correct one.
+// For RAM, it will always resolve to "https://ram.aliyuncs.com"
+// no matter what region you plug in.
+// For support on this assertion, see
+// https://www.alibabacloud.com/help/doc-detail/28672.htm?spm=a2c63.p38356.b99.49.7e001606Bs8ENp and
+// https://github.com/aliyun/alibaba-cloud-sdk-go/blob/61403c78b5eb7b3360e31ec12aa8b03d14d735eb/sdk/endpoints/endpoints_config.go#L425
+const ramRegion = "us-east-1"
 
-func (b *backend) getSTSClient(ctx context.Context, s logical.Storage, regionID string) (*sts.Client, error) {
-	credential, err := b.getCredential(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-	return sts.NewClientWithOptions(regionID, sdk.NewConfig(), credential)
-}
-
-func (b *backend) getRAMClient(ctx context.Context, s logical.Storage) (*ram.Client, error) {
-	credential, err := b.getCredential(ctx, s)
+func getRAMClient(storedConf *clientConfig) (*ram.Client, error) {
+	credential, err := getCredential(storedConf)
 	if err != nil {
 		return nil, err
 	}
 	config := sdk.NewConfig()
 	config.Scheme = "https"
-	return ram.NewClientWithOptions("", config, credential)
+	return ram.NewClientWithOptions(ramRegion, config, credential)
 }
 
-func (b *backend) getCredential(ctx context.Context, s logical.Storage) (auth.Credential, error) {
-	// Read the configured secret key and access key
-	config, err := b.nonLockedClientConfigEntry(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-
-	if config != nil {
-		if config.AccessKey != "" && config.SecretKey != "" {
-			return credentials.NewAccessKeyCredential(config.AccessKey, config.SecretKey), nil
+func getCredential(storedConf *clientConfig) (auth.Credential, error) {
+	if storedConf != nil {
+		if storedConf.AccessKey != "" && storedConf.SecretKey != "" {
+			return credentials.NewAccessKeyCredential(storedConf.AccessKey, storedConf.SecretKey), nil
 		}
-	}
-
-	// Read the secret key and access key from the outer environment.
-	accessKey := os.Getenv(EnvVarAccessKeyID)
-	secretKey := os.Getenv(EnvVarSecretAccessKey)
-	if accessKey != "" && secretKey != "" {
-		return credentials.NewAccessKeyCredential(accessKey, secretKey), nil
 	}
 	return nil, errors.New("unable to determine credential")
 }
