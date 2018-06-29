@@ -2,9 +2,10 @@ package ali
 
 import "time"
 
-// Struct to hold the information associated with a Vault role
+// Struct to hold the information associated with a Vault authTypeRole
 type RoleEntry struct {
-	ARN      string      `json:"arn"`
+	ARN      string        `json:"arn"`
+	AuthType authType      `json:"auth_type"`
 	Policies []string      `json:"policies"`
 	TTL      time.Duration `json:"ttl"`
 	MaxTTL   time.Duration `json:"max_ttl"`
@@ -13,7 +14,7 @@ type RoleEntry struct {
 
 func (r *RoleEntry) ToResponseData() map[string]interface{} {
 	responseData := map[string]interface{}{
-		"arn": r.ARN,
+		"arn":      r.ARN,
 		"policies": r.Policies,
 		"ttl":      r.TTL / time.Second,
 		"max_ttl":  r.MaxTTL / time.Second,
@@ -23,7 +24,7 @@ func (r *RoleEntry) ToResponseData() map[string]interface{} {
 	if r.ARN == "" {
 		responseData["arn"] = []string{}
 	} else {
-		responseData["arn"] =  r.ARN
+		responseData["arn"] = r.ARN
 	}
 
 	return responseData

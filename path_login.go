@@ -5,42 +5,39 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/vault/helper/jsonutil"
-	"github.com/hashicorp/vault/helper/strutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
-	"io/ioutil"
 )
 
 func pathLogin(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "login$",
 		Fields: map[string]*framework.FieldSchema{
-			"role": {
-				Type: framework.TypeString,
-				Description: `Name of the role against which the login is being attempted.`,
-			},
-			"ram_request_url": {
-				Type: framework.TypeString,
+			"identity_request_url": {
+				Type:        framework.TypeString,
 				Description: `Base64-encoded full URL against which to make the Alibaba request.`,
 			},
-			"ram_request_headers": {
+			"identity_request_headers": {
 				Type: framework.TypeString,
 				Description: `Base64-encoded JSON representation of the request headers. 
 This must include the headers over which Alibaba has included a signature.`,
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation:         b.pathLoginUpdate,
-			logical.AliasLookaheadOperation: b.pathLoginUpdate,
+			logical.UpdateOperation: b.pathLoginUpdate,
 		},
 		HelpSynopsis:    pathLoginSyn,
 		HelpDescription: pathLoginDesc,
@@ -48,83 +45,30 @@ This must include the headers over which Alibaba has included a signature.`,
 }
 
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	if !hasValuesForRamAuth(data) {
-		return logical.ErrorResponse("supplied some of the auth values for the ram auth type but not all"), nil
-	}
-	return b.pathLoginUpdateRam(ctx, req, data)
-}
 
-// pathLoginRenew is used to renew an authenticated token
-func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	return b.pathLoginRenewRam(ctx, req, data)
-}
-
-func (b *backend) pathLoginRenewRam(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	canonicalArn := req.Auth.Metadata["canonical_arn"]
-	if canonicalArn == "" {
-		return nil, fmt.Errorf("unable to retrieve canonical ARN from metadata during renewal")
-	}
-
-	roleName := req.Auth.InternalData["role_name"].(string)
-	if roleName == "" {
-		return nil, fmt.Errorf("error retrieving role_name during renewal")
-	}
-	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
-	if err != nil {
-		return nil, err
-	}
-	if roleEntry == nil {
-		return nil, fmt.Errorf("role entry not found")
-	}
-
-	if len(roleEntry.BoundRamPrincipalARNs) > 0 {
-		switch {
-		case !roleEntry.ResolveAlibabaUniqueIDs && strutil.StrListContains(roleEntry.BoundRamPrincipalARNs, canonicalArn):
-		default:
-			matchedWildcardBind := false
-			for _, principalARN := range roleEntry.BoundRamPrincipalARNs {
-				if strings.HasSuffix(principalARN, "*") && strutil.GlobbedStringsMatch(principalARN, canonicalArn) {
-					matchedWildcardBind = true
-					break
-				}
-			}
-			if !matchedWildcardBind {
-				return nil, fmt.Errorf("role no longer bound to ARN %q", canonicalArn)
-			}
-		}
-	}
-
-	resp := &logical.Response{Auth: req.Auth}
-	resp.Auth.TTL = roleEntry.TTL
-	resp.Auth.MaxTTL = roleEntry.MaxTTL
-	resp.Auth.Period = roleEntry.Period
-	return resp, nil
-}
-
-func (b *backend) pathLoginUpdateRam(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	rawUrlB64 := data.Get("ram_request_url").(string)
+	rawUrlB64 := data.Get("identity_request_url").(string)
 	if rawUrlB64 == "" {
-		return logical.ErrorResponse("missing ram_request_url"), nil
+		return logical.ErrorResponse("missing identity_request_url"), nil
 	}
 	rawUrl, err := base64.StdEncoding.DecodeString(rawUrlB64)
 	if err != nil {
-		return logical.ErrorResponse("failed to base64 decode ram_request_url"), nil
+		return logical.ErrorResponse("failed to base64 decode identity_request_url"), nil
 	}
 	parsedUrl, err := url.Parse(string(rawUrl))
 	if err != nil {
-		return logical.ErrorResponse("error parsing ram_request_url"), nil
+		return logical.ErrorResponse("error parsing identity_request_url"), nil
 	}
 
-	headersB64 := data.Get("ram_request_headers").(string)
+	headersB64 := data.Get("identity_request_headers").(string)
 	if headersB64 == "" {
-		return logical.ErrorResponse("missing ram_request_headers"), nil
+		return logical.ErrorResponse("missing identity_request_headers"), nil
 	}
 	headers, err := parseRamRequestHeaders(headersB64)
 	if err != nil {
-		return logical.ErrorResponse(fmt.Sprintf("Error parsing ram_request_headers: %v", err)), nil
+		return logical.ErrorResponse(fmt.Sprintf("Error parsing identity_request_headers: %v", err)), nil
 	}
 	if headers == nil {
-		return logical.ErrorResponse("nil response when parsing ram_request_headers"), nil
+		return logical.ErrorResponse("nil response when parsing identity_request_headers"), nil
 	}
 
 	config, err := b.lockedClientConfigEntry(ctx, req.Storage)
@@ -144,54 +88,24 @@ func (b *backend) pathLoginUpdateRam(ctx context.Context, req *logical.Request, 
 	if err != nil {
 		return logical.ErrorResponse(fmt.Sprintf("error making upstream request: %v", err)), nil
 	}
-	// This could either be a "userID:SessionID" (in the case of an assumed role) or just a "userID"
-	// (in the case of an RAM user).
-	callerUniqueId := strings.Split(callerID.UserID, ":")[0]
 
-	// If we're just looking up for MFA, return the Alias info
-	if req.Operation == logical.AliasLookaheadOperation {
-		return &logical.Response{
-			Auth: &logical.Auth{
-				Alias: &logical.Alias{
-					Name: callerUniqueId,
-				},
-			},
-		}, nil
-	}
-
-	entity, err := parseRamArn(callerID.ARN)
+	ramRole, err := b.getMatchingRole(ctx, req.Storage, callerID.RoleId)
 	if err != nil {
-		return logical.ErrorResponse(fmt.Sprintf("error parsing arn %q: %v", callerID.ARN, err)), nil
+		return logical.ErrorResponse(fmt.Sprintf("error finding matching authTypeRole: %s", err)), nil
 	}
 
-	roleName := data.Get("role").(string)
-	if roleName == "" {
-		roleName = entity.FriendlyName
-	}
-
-	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
+	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, ramRole.RoleName)
 	if err != nil {
 		return nil, err
 	}
 	if roleEntry == nil {
-		return logical.ErrorResponse(fmt.Sprintf("entry for role %s not found", roleName)), nil
+		return logical.ErrorResponse(fmt.Sprintf("entry for authTypeRole %s not found", ramRole.RoleName)), nil
 	}
 
-	if len(roleEntry.BoundRamPrincipalARNs) > 0 {
-		switch {
-		case !roleEntry.ResolveAlibabaUniqueIDs && strutil.StrListContains(roleEntry.BoundRamPrincipalARNs, entity.canonicalArn()):
-		default:
-			matchedWildcardBind := false
-			for _, principalARN := range roleEntry.BoundRamPrincipalARNs {
-				if strings.HasSuffix(principalARN, "*") && strutil.GlobbedStringsMatch(principalARN, callerID.ARN) {
-					matchedWildcardBind = true
-					break
-				}
-			}
-			if !matchedWildcardBind {
-				return logical.ErrorResponse(fmt.Sprintf("RAM Principal %q does not belong to the role %q", callerID.ARN, roleName)), nil
-			}
-		}
+	// This check protects against someone creating a different role with the same name as one that has access in Vault,
+	// and using it to gain access they shouldn't have.
+	if roleEntry.ARN != callerID.Arn {
+		return logical.ErrorResponse("the caller's ARN does not match the role's ARN"), nil
 	}
 
 	resp := &logical.Response{
@@ -199,70 +113,139 @@ func (b *backend) pathLoginUpdateRam(ctx context.Context, req *logical.Request, 
 			Period:   roleEntry.Period,
 			Policies: roleEntry.Policies,
 			Metadata: map[string]string{
-				"client_arn":           callerID.ARN,
-				"canonical_arn":        entity.canonicalArn(),
-				"client_user_id":       callerUniqueId,
-				"account_id":           entity.AccountNumber,
+				"account_id":    callerID.AccountId,
+				"user_id":       callerID.UserId,
+				"role_id":       callerID.RoleId,
+				"arn":           callerID.Arn,
+				"identity_type": callerID.IdentityType,
+				"principal_id":  callerID.PrincipalId,
+				"request_id":    callerID.RequestId,
+				"role_name":     ramRole.RoleName,
 			},
 			InternalData: map[string]interface{}{
-				"role_name": roleName,
+				"role_name": ramRole.RoleName,
 			},
-			DisplayName: entity.FriendlyName,
+			DisplayName: callerID.PrincipalId,
 			LeaseOptions: logical.LeaseOptions{
 				Renewable: true,
 				TTL:       roleEntry.TTL,
 				MaxTTL:    roleEntry.MaxTTL,
 			},
 			Alias: &logical.Alias{
-				Name: callerUniqueId,
+				Name: callerID.PrincipalId,
 			},
 		},
 	}
-
 	return resp, nil
 }
 
-func hasValuesForRamAuth(data *framework.FieldData) bool {
-	_, hasRequestURL := data.GetOk("ram_request_url")
-	_, hasRequestHeaders := data.GetOk("ram_request_headers")
-	return hasRequestURL && hasRequestHeaders
+func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	arn := req.Auth.Metadata["arn"]
+	if arn == "" {
+		return nil, fmt.Errorf("unable to retrieve ARN from metadata during renewal")
+	}
+	roleName := req.Auth.InternalData["role_name"].(string)
+	if roleName == "" {
+		return nil, fmt.Errorf("error retrieving role_name during renewal")
+	}
+
+	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if roleEntry == nil {
+		return nil, fmt.Errorf("role entry not found")
+	}
+
+	if roleEntry.ARN != arn {
+		return logical.ErrorResponse("the caller's ARN does not match the role's ARN"), nil
+	}
+
+	resp := &logical.Response{Auth: req.Auth}
+	resp.Auth.TTL = roleEntry.TTL
+	resp.Auth.MaxTTL = roleEntry.MaxTTL
+	resp.Auth.Period = roleEntry.Period
+	return resp, nil
 }
 
-func parseRamArn(ramArn string) (*ramEntity, error) {
-	var entity ramEntity
-	fullParts := strings.Split(ramArn, ":")
-	if len(fullParts) != 5 {
-		return nil, fmt.Errorf("unrecognized arn: contains %d colon-separated parts, expected 5", len(fullParts))
+func submitCallerIdentityRequest(headers http.Header, u *url.URL) (*sts.GetCallerIdentityResponse, error) {
+	request, err := http.NewRequest(http.MethodPost, u.String(), nil)
+	if err != nil {
+		return nil, err
 	}
-	if fullParts[0] != "acs" {
-		return nil, fmt.Errorf("unrecognized arn: does not begin with \"acs:\"")
+	request.Header = headers
+
+	client := cleanhttp.DefaultClient()
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
 	}
-	entity.ACS = fullParts[0]
-	if fullParts[1] != "ram" && fullParts[1] != "sts" {
-		return nil, fmt.Errorf("unrecognized service: %v, not one of ram or sts", fullParts[1])
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, errwrap.Wrapf("error making request: {{err}}", err)
 	}
-	entity.AccountNumber = fullParts[3]
-	parts := strings.Split(fullParts[4], "/")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("unrecognized arn: %q contains fewer than 2 slash-separated parts", fullParts[4])
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		b, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return nil, errwrap.Wrapf("error reading reponse body: {{err}}", err)
+		}
+		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
 	}
-	entity.Type = parts[0]
-	entity.Path = strings.Join(parts[1:len(parts)-1], "/")
-	entity.FriendlyName = parts[len(parts)-1]
-	// now, entity.FriendlyName should either be <UserName> or <RoleName>
-	switch entity.Type {
-	case "assumed-role":
-		// Assumed roles don't have paths and have a slightly different format
-		// parts[2] is <RoleSessionName>
-		entity.Path = ""
-		entity.FriendlyName = parts[1]
-		entity.SessionInfo = parts[2]
-	case "user":
-	case "role":
-	default:
-		return &ramEntity{}, fmt.Errorf("unrecognized principal type: %q", entity.Type)
+
+	result := &sts.GetCallerIdentityResponse{}
+	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
+		return nil, errwrap.Wrapf("error decoding reponse: {{err}}", err)
 	}
-	return &entity, nil
+	return result, nil
+}
+
+// getMatchingRamRole lists all the ram roles to identify one with a matching authTypeRole ID.
+// That's because the RAM API supports GetRole but only using the roleName, not the roleID,
+// which is the only information we here.
+// To lighten the potential API load against Alibaba, we cache the results of each page we get.
+func (b *backend) getMatchingRole(ctx context.Context, s logical.Storage, roleId string) (ram.Role, error) {
+
+	// Is it cached?
+	roleIfc, found := b.remoteRoleCache.Get(roleId)
+	if found {
+		return roleIfc.(ram.Role), nil
+	}
+
+	// Nope, let's go find it!
+	client, err := b.getRAMClient(ctx, s)
+	if err != nil {
+		return ram.Role{}, err
+	}
+	req := ram.CreateListRolesRequest()
+	req.MaxItems = requests.NewInteger(500)
+
+	shouldSearch := true
+	for shouldSearch {
+		resp, err := client.ListRoles(req)
+		if err != nil {
+			return ram.Role{}, err
+		}
+
+		found := false
+		result := ram.Role{}
+		for _, role := range resp.Roles.Role {
+			b.remoteRoleCache.Set(role.RoleId, role, 0)
+			if role.RoleId == roleId {
+				// Since we went to the effort of making the API request,
+				// let's cache all the results on this page before we return.
+				found = true
+				result = role
+			}
+		}
+		if found {
+			return result, nil
+		}
+
+		req.Marker = resp.Marker
+		shouldSearch = resp.IsTruncated
+	}
+	return ram.Role{}, fmt.Errorf("no Alibaba authTypeRole matches roleID %s", roleId)
 }
 
 func validateVaultHeaderValue(headers http.Header, requiredHeaderValue string) error {
@@ -311,12 +294,12 @@ func ensureHeaderIsSigned(signedHeaders, headerToSign string) error {
 func parseRamRequestHeaders(headersB64 string) (http.Header, error) {
 	headersJson, err := base64.StdEncoding.DecodeString(headersB64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode ram_request_headers")
+		return nil, fmt.Errorf("failed to base64 decode identity_request_headers")
 	}
 	var headersDecoded map[string]interface{}
 	err = jsonutil.DecodeJSON(headersJson, &headersDecoded)
 	if err != nil {
-		return nil, errwrap.Wrapf(fmt.Sprintf("failed to JSON decode ram_request_headers %q: {{err}}", headersJson), err)
+		return nil, errwrap.Wrapf(fmt.Sprintf("failed to JSON decode identity_request_headers %q: {{err}}", headersJson), err)
 	}
 	headers := make(http.Header)
 	for k, v := range headersDecoded {
@@ -343,64 +326,46 @@ func parseRamRequestHeaders(headersB64 string) (http.Header, error) {
 	return headers, nil
 }
 
-func submitCallerIdentityRequest(headers http.Header, u *url.URL) (*GetCallerIdentityResult, error) {
-	request, err := http.NewRequest(http.MethodPost, u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	request.Header = headers
+type authType int
 
-	client := cleanhttp.DefaultClient()
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, errwrap.Wrapf("error making request: {{err}}", err)
-	}
-	defer response.Body.Close()
+const (
+	authTypeRole authType = iota
+)
 
-	if response.StatusCode != 200 {
-		b, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return nil, errwrap.Wrapf("error reading reponse body: {{err}}", err)
-		}
-		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
-	}
-
-	result := &GetCallerIdentityResult{}
-	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
-		return nil, errwrap.Wrapf("error decoding reponse: {{err}}", err)
-	}
-	return result, nil
-}
-
-type GetCallerIdentityResult struct {
-	AccountID    string `json:"AccountId"`
-	RequestID    string `json:"RequestID"`
-	PrincipalID  string `json:"PrincipalID"`
-	IdentityType string `json:"IdentityType"`
-	ARN          string `json:"ARN"`
-	UserID       string `json:"UserID"`
-}
-
-type ramEntity struct {
-	ACS           string
+type parsedRam struct {
 	AccountNumber string
-	Type          string
-	Path          string
+	AuthType      authType
 	FriendlyName  string
-	SessionInfo   string
 }
 
-// TODO I don't think this is accurate or needed, this entire method, need to test.
-// Returns a Vault-internal canonical ARN for referring to an RAM entity
-func (e *ramEntity) canonicalArn() string {
-	entityType := e.Type
-	if entityType == "assumed-role" {
-		entityType = "role"
+func parseRamArn(ramArn string) (*parsedRam, error) {
+	var parsed parsedRam
+	fullParts := strings.Split(ramArn, ":")
+	if len(fullParts) != 5 {
+		return nil, fmt.Errorf("unrecognized arn: contains %d colon-separated parts, expected 5", len(fullParts))
 	}
-	return fmt.Sprintf("arn:%s:ram::%s:%s/%s", e.ACS, e.AccountNumber, entityType, e.FriendlyName)
+	if fullParts[0] != "acs" {
+		return nil, fmt.Errorf("unrecognized arn: does not begin with \"acs:\"")
+	}
+	if fullParts[1] != "ram" {
+		return nil, fmt.Errorf("unrecognized service: %v, not ram", fullParts[1])
+	}
+	parsed.AccountNumber = fullParts[3]
+	parts := strings.Split(fullParts[4], "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("unrecognized arn: %q contains fewer than 2 slash-separated parts", fullParts[4])
+	}
+	entityType := parts[0]
+	switch entityType {
+	case "authTypeRole":
+		parsed.AuthType = authTypeRole
+	default:
+		return &parsedRam{}, fmt.Errorf("unsupported parsed type: %s", entityType)
+	}
+
+	parsed.FriendlyName = parts[len(parts)-1]
+
+	return &parsed, nil
 }
 
 const instanceIdentityAudienceHeader = "audience"

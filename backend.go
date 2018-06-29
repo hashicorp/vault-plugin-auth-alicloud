@@ -2,12 +2,12 @@ package ali
 
 import (
 	"context"
-	"fmt"
 	"sync"
+	"time"
 
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/patrickmn/go-cache"
 )
 
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
@@ -26,6 +26,11 @@ type backend struct {
 
 	roleMgr *RoleManager
 
+	// remoteRoleCache is a cache for the roles we receive in a "ListRoles" response
+	// from Alibaba, allowing us to reduce the number of calls we make for this possibly
+	// expensive, paginating operation.
+	remoteRoleCache *cache.Cache
+
 	// Lock to make changes to any of the backend's configuration endpoints.
 	configMutex sync.RWMutex
 
@@ -35,11 +40,9 @@ type backend struct {
 func Backend(conf *logical.BackendConfig) (*backend, error) {
 	roleMgr := &RoleManager{}
 	b := &backend{
-		roleMgr:             roleMgr,
+		roleMgr:         roleMgr,
+		remoteRoleCache: cache.New(time.Minute, time.Minute),
 	}
-
-	b.resolveArnToUniqueIDFunc = b.resolveArnToRealUniqueId
-
 	b.Backend = &framework.Backend{
 		AuthRenew: b.pathLoginRenew,
 		Help:      backendHelp,
@@ -61,46 +64,6 @@ func Backend(conf *logical.BackendConfig) (*backend, error) {
 		BackendType: logical.TypeCredential,
 	}
 	return b, nil
-}
-
-// Putting this here so we can inject a fake resolver into the backend for unit testing
-// purposes
-func (b *backend) resolveArnToRealUniqueId(ctx context.Context, s logical.Storage, arn string) (string, error) {
-	entity, err := parseRamArn(arn)
-	if err != nil {
-		return "", err
-	}
-
-	iamClient, err := b.getRAMClient(ctx, s)
-	if err != nil {
-		return "", err
-	}
-	switch entity.Type {
-	case "user":
-		req := ram.CreateGetUserRequest()
-		req.UserName = entity.FriendlyName
-		userInfo, err := iamClient.GetUser(req)
-		if err != nil {
-			return "", err
-		}
-		if userInfo == nil {
-			return "", fmt.Errorf("got nil result from GetUser")
-		}
-		return userInfo.User.UserId, nil
-	case "role":
-		req := ram.CreateGetRoleRequest()
-		req.RoleName = entity.FriendlyName
-		roleInfo, err := iamClient.GetRole(req)
-		if err != nil {
-			return "", err
-		}
-		if roleInfo == nil {
-			return "", fmt.Errorf("got nil result from GetRole")
-		}
-		return roleInfo.Role.RoleId, nil
-	default:
-		return "", fmt.Errorf("unrecognized error type %#v", entity.Type)
-	}
 }
 
 const backendHelp = `

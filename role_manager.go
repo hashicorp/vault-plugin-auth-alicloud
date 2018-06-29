@@ -15,7 +15,7 @@ type RoleManager struct {
 
 func (m *RoleManager) Read(ctx context.Context, s logical.Storage, roleName string) (*RoleEntry, error) {
 	if roleName == "" {
-		return nil, fmt.Errorf("missing role name")
+		return nil, fmt.Errorf("missing authTypeRole name")
 	}
 	m.roleMutex.RLock()
 	defer m.roleMutex.RUnlock()
@@ -25,15 +25,15 @@ func (m *RoleManager) Read(ctx context.Context, s logical.Storage, roleName stri
 func (m *RoleManager) List(ctx context.Context, s logical.Storage) ([]string, error) {
 	m.roleMutex.RLock()
 	defer m.roleMutex.RUnlock()
-	return s.List(ctx, "role/")
+	return s.List(ctx, "authTypeRole/")
 }
 
 func (m *RoleManager) Update(ctx context.Context, s logical.Storage, roleName string, roleEntry *RoleEntry) error {
 	if roleName == "" {
-		return fmt.Errorf("missing role name")
+		return fmt.Errorf("missing authTypeRole name")
 	}
 	if roleEntry == nil {
-		return fmt.Errorf("nil role entry")
+		return fmt.Errorf("nil authTypeRole entry")
 	}
 	m.roleMutex.Lock()
 	defer m.roleMutex.Unlock()
@@ -43,17 +43,17 @@ func (m *RoleManager) Update(ctx context.Context, s logical.Storage, roleName st
 func (m *RoleManager) Delete(ctx context.Context, s logical.Storage, roleName string) error {
 	m.roleMutex.Lock()
 	defer m.roleMutex.Unlock()
-	return s.Delete(ctx, "role/"+strings.ToLower(roleName))
+	return s.Delete(ctx, "authTypeRole/"+strings.ToLower(roleName))
 }
 
 func (m *RoleManager) setRole(ctx context.Context, s logical.Storage, roleName string, roleEntry *RoleEntry) error {
 	if roleName == "" {
-		return fmt.Errorf("missing role name")
+		return fmt.Errorf("missing authTypeRole name")
 	}
 	if roleEntry == nil {
-		return fmt.Errorf("nil role entry")
+		return fmt.Errorf("nil authTypeRole entry")
 	}
-	entry, err := logical.StorageEntryJSON("role/"+strings.ToLower(roleName), roleEntry)
+	entry, err := logical.StorageEntryJSON("authTypeRole/"+strings.ToLower(roleName), roleEntry)
 	if err != nil {
 		return err
 	}
@@ -65,9 +65,9 @@ func (m *RoleManager) setRole(ctx context.Context, s logical.Storage, roleName s
 
 func (m *RoleManager) getRole(ctx context.Context, s logical.Storage, roleName string) (*RoleEntry, error) {
 	if roleName == "" {
-		return nil, fmt.Errorf("missing role name")
+		return nil, fmt.Errorf("missing authTypeRole name")
 	}
-	entry, err := s.Get(ctx, "role/"+strings.ToLower(roleName))
+	entry, err := s.Get(ctx, "authTypeRole/"+strings.ToLower(roleName))
 	if err != nil {
 		return nil, err
 	}

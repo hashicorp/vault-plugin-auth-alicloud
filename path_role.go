@@ -13,20 +13,20 @@ import (
 
 func pathRole(b *backend) *framework.Path {
 	return &framework.Path{
-		Pattern: "role/" + framework.GenericNameRegex("role"),
+		Pattern: "authTypeRole/" + framework.GenericNameRegex("authTypeRole"),
 		Fields: map[string]*framework.FieldSchema{
-			"role": {
-				Type: framework.TypeString,
-				Description: "The name of the role as it should appear in Vault.",
+			"authTypeRole": {
+				Type:        framework.TypeString,
+				Description: "The name of the authTypeRole as it should appear in Vault.",
 			},
 			"arn": {
-				Type: framework.TypeString,
-				Description: `ARN of the RAM principals to bind to this role.`,
+				Type:        framework.TypeString,
+				Description: `ARN of the RAM principals to bind to this authTypeRole.`,
 			},
 			"policies": {
 				Type:        framework.TypeCommaStringSlice,
 				Default:     "default",
-				Description: "Policies to be set on tokens issued using this role.",
+				Description: "Policies to be set on tokens issued using this authTypeRole.",
 			},
 			"ttl": {
 				Type:    framework.TypeDurationSecond,
@@ -37,13 +37,13 @@ to 0, in which case the value will fallback to the system/mount defaults.`,
 			"max_ttl": {
 				Type:        framework.TypeDurationSecond,
 				Default:     0,
-				Description: "The maximum allowed lifetime of tokens issued using this role.",
+				Description: "The maximum allowed lifetime of tokens issued using this authTypeRole.",
 			},
 			"period": {
 				Type:    framework.TypeDurationSecond,
 				Default: 0,
 				Description: `
-If set, indicates that the token generated using this role should never expire.
+If set, indicates that the token generated using this authTypeRole should never expire.
 The token should be renewed within the duration specified by this value. At
 each renewal, the token's TTL will be set to the value of this parameter.`,
 			},
@@ -62,7 +62,7 @@ each renewal, the token's TTL will be set to the value of this parameter.`,
 
 func pathListRole(b *backend) *framework.Path {
 	return &framework.Path{
-		Pattern: "role/?",
+		Pattern: "authTypeRole/?",
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ListOperation: b.pathRoleList,
 		},
@@ -85,7 +85,7 @@ func pathListRoles(b *backend) *framework.Path {
 // Establishes dichotomy of request operation between CreateOperation and UpdateOperation.
 // Returning 'true' forces an UpdateOperation, CreateOperation otherwise.
 func (b *backend) pathRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
-	entry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("role").(string)))
+	entry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("authTypeRole").(string)))
 	if err != nil {
 		return false, err
 	}
@@ -93,9 +93,9 @@ func (b *backend) pathRoleExistenceCheck(ctx context.Context, req *logical.Reque
 }
 
 func (b *backend) pathRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("role").(string)
+	roleName := data.Get("authTypeRole").(string)
 	if roleName == "" {
-		return logical.ErrorResponse("missing role"), nil
+		return logical.ErrorResponse("missing authTypeRole"), nil
 	}
 	return nil, b.roleMgr.Delete(ctx, req.Storage, roleName)
 }
@@ -109,7 +109,7 @@ func (b *backend) pathRoleList(ctx context.Context, req *logical.Request, data *
 }
 
 func (b *backend) pathRoleRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("role").(string)))
+	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("authTypeRole").(string)))
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +123,9 @@ func (b *backend) pathRoleRead(ctx context.Context, req *logical.Request, data *
 
 func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
-	roleName := data.Get("role").(string)
+	roleName := data.Get("authTypeRole").(string)
 	if roleName == "" {
-		return logical.ErrorResponse("missing role"), nil
+		return logical.ErrorResponse("missing authTypeRole"), nil
 	}
 
 	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
@@ -140,14 +140,17 @@ func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request
 	if arn == "" {
 		return logical.ErrorResponse("missing arn"), nil
 	}
-
-	entity, err := parseRamArn(arn)
+	// Parse the ram to ensure it's for a supported parsed type.
+	parsed, err := parseRamArn(arn)
 	if err != nil {
 		return logical.ErrorResponse("unable to parse arn: " + arn + " due to " + err.Error()), nil
 	}
-	if entity.Type != "role" {
-		return logical.ErrorResponse("only role arns are currently supported"), nil
+
+	// All roles must bear the same name as the ramRole to facilitate looking them up.
+	if roleName != parsed.FriendlyName {
+		return logical.ErrorResponse(fmt.Sprintf("authTypeRole name must match arn name of %s", parsed.FriendlyName)), nil
 	}
+	roleEntry.AuthType = parsed.AuthType
 
 	if policies, ok := data.GetOk("policies"); ok {
 		roleEntry.Policies = policyutil.ParsePolicies(policies)
@@ -178,15 +181,15 @@ func (b *backend) pathRoleCreateUpdate(ctx context.Context, req *logical.Request
 }
 
 const pathRoleSyn = `
-Create a role and associate policies to it.
+Create a authTypeRole and associate policies to it.
 `
 
 const pathRoleDesc = `
-A precondition for login is that a role should be created in the backend.
-The login endpoint takes in the role name against which the instance
+A precondition for login is that a authTypeRole should be created in the backend.
+The login endpoint takes in the authTypeRole name against which the instance
 should be validated. After authenticating the instance, the authorization
 for the instance to access Vault's resources is determined by the policies
-that are associated to the role though this endpoint.
+that are associated to the authTypeRole though this endpoint.
 
 Also, a 'max_ttl' can be configured in this endpoint that determines the maximum
 duration for which a login can be renewed. Note that the 'max_ttl' has an upper
@@ -198,5 +201,5 @@ Lists all the roles that are registered with Vault.
 `
 
 const pathListRolesHelpDesc = `
-Roles will be listed by their respective role names.
+Roles will be listed by their respective authTypeRole names.
 `
