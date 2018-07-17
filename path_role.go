@@ -2,12 +2,11 @@ package ali
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"errors"
-	"github.com/hashicorp/vault-plugin-auth-alibaba/helper/ttls"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
 )
@@ -96,7 +95,7 @@ func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request,
 		return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
 	}
 	if arn.Type != arnTypeRole {
-		return nil, fmt.Errorf(`only role arn types are supported at this time, but %s was provided`, entry.ARN)
+		return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
 	}
 
 	entry.ARN = arn
@@ -105,16 +104,17 @@ func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request,
 	entry.MaxTTL = time.Duration(data.Get("max_ttl").(int)) * time.Second
 	entry.Period = time.Duration(data.Get("period").(int)) * time.Second
 
-	ttlValidator := ttls.MountHandler{
-		RoleTTL:    entry.TTL,
-		RoleMaxTTL: entry.MaxTTL,
-	}
-	if err := ttlValidator.Validate(b.System()); err != nil {
-		return nil, err
+	if entry.TTL > entry.MaxTTL {
+		return nil, fmt.Errorf("ttl exceeds max_ttl")
 	}
 
 	if err := b.roleMgr.Update(ctx, req.Storage, roleName, entry); err != nil {
 		return nil, err
+	}
+	if entry.TTL > b.System().MaxLeaseTTL() {
+		resp := &logical.Response{}
+		resp.AddWarning(fmt.Sprintf("ttl of %d exceeds the system max ttl of %d, the latter will be used during login", entry.TTL, b.System().MaxLeaseTTL()))
+		return resp, nil
 	}
 	return nil, nil
 }
@@ -169,23 +169,14 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 		entry.Policies = raw.([]string)
 	}
 
-	ttlsChanged := false
 	if raw, ok := data.GetOk("ttl"); ok {
-		ttlsChanged = true
 		entry.TTL = time.Duration(raw.(int)) * time.Second
 	}
 	if raw, ok := data.GetOk("max_ttl"); ok {
-		ttlsChanged = true
 		entry.MaxTTL = time.Duration(raw.(int)) * time.Second
 	}
-	if ttlsChanged {
-		ttlValidator := ttls.MountHandler{
-			RoleTTL:    entry.TTL,
-			RoleMaxTTL: entry.MaxTTL,
-		}
-		if err := ttlValidator.Validate(b.System()); err != nil {
-			return nil, err
-		}
+	if entry.TTL > entry.MaxTTL {
+		return nil, fmt.Errorf("ttl exceeds max_ttl")
 	}
 
 	if raw, ok := data.GetOk("period"); ok {
@@ -193,6 +184,11 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 	}
 	if err := b.roleMgr.Update(ctx, req.Storage, roleName, entry); err != nil {
 		return nil, err
+	}
+	if entry.TTL > b.System().MaxLeaseTTL() {
+		resp := &logical.Response{}
+		resp.AddWarning(fmt.Sprintf("ttl of %d exceeds the system max ttl of %d, the latter will be used during login", entry.TTL, b.System().MaxLeaseTTL()))
+		return resp, nil
 	}
 	return nil, nil
 }

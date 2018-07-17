@@ -18,9 +18,6 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 			Unauthenticated: []string{
 				"login",
 			},
-			SealWrapStorage: []string{
-				"config/client",
-			},
 		},
 		Paths: []*framework.Path{
 			pathLogin(b),
