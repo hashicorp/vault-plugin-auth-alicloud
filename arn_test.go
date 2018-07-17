@@ -6,7 +6,7 @@ import (
 
 func TestParseRoleArn(t *testing.T) {
 	arn := "acs:ram::5128828231865463:role/elk"
-	result, err := parse(arn)
+	result, err := parseARN(arn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestParseRoleArn(t *testing.T) {
 
 func TestParseAssumedRoleArn(t *testing.T) {
 	arn := "acs:ram::5128828231865463:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q"
-	result, err := parse(arn)
+	result, err := parseARN(arn)
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +46,7 @@ func TestParseAssumedRoleArn(t *testing.T) {
 
 func TestParseEmpty(t *testing.T) {
 	arn := ""
-	_, err := parse(arn)
+	_, err := parseARN(arn)
 	if err == nil {
 		t.Fatal("expected an err")
 	}

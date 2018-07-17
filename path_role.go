@@ -22,7 +22,7 @@ func pathRole(b *backend) *framework.Path {
 			},
 			"arn": {
 				Type:        framework.TypeString,
-				Description: `arn of the RAM principals to bind to this role.`,
+				Description: "ARN of the RAM to bind to this role.",
 			},
 			"policies": {
 				Type:        framework.TypeCommaStringSlice,
@@ -87,18 +87,15 @@ func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request,
 	}
 
 	entry := &roleEntry{}
-	arn, err := parse(data.Get("arn").(string))
+	arn, err := parseARN(data.Get("arn").(string))
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
+		return nil, fmt.Errorf("unable to parseARN arn %s: %s", arn, err)
 	}
 	if roleName != arn.RoleName {
 		// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
 		return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
 	}
 	if arn.Type != arnTypeRole {
-		// We haven't tested with other arn types and would like to understand and test these use cases before blindly
-		// granting access so we don't create a security vulnerability. Please open a ticket describing your use case
-		// for another arn type to get that started.
 		return nil, fmt.Errorf(`only role arn types are supported at this time, but %s was provided`, entry.ARN)
 	}
 
@@ -152,9 +149,9 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 	}
 
 	if raw, ok := data.GetOk("arn"); ok {
-		arn, err := parse(raw.(string))
+		arn, err := parseARN(raw.(string))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
+			return nil, fmt.Errorf("unable to parseARN arn %s: %s", arn, err)
 		}
 		if roleName != arn.RoleName {
 			// All roles must bear the same name as the ramRole to facilitate looking them up at login time.

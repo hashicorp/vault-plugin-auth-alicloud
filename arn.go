@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func parse(a string) (*arn, error) {
+func parseARN(a string) (*arn, error) {
 	if a == "" {
 		return nil, errors.New("no arn provided")
 	}

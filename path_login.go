@@ -68,15 +68,12 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("error making upstream request: %v", err)
 	}
 
-	parsedARN, err := parse(callerIdentity.Arn)
+	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, fmt.Errorf(`unable to parse entity's arn %s due to %s`, callerIdentity.Arn, err)
+		return nil, fmt.Errorf("unable to parseARN entity's arn %s due to %s", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
-		// We haven't tested with other arn types and would like to understand and test these use cases before blindly
-		// granting access so we don't create a security vulnerability. Please open a ticket describing your use case
-		// for another arn type to get that started.
-		return nil, fmt.Errorf(`only role arn types are supported at this time, but %s was provided`, callerIdentity.Arn)
+		return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", callerIdentity.Arn)
 	}
 
 	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, parsedARN.RoleName)
@@ -125,7 +122,12 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data
 	if arn == "" {
 		return nil, errors.New("unable to retrieve arn from metadata during renewal")
 	}
-	roleName := req.Auth.InternalData["role_name"].(string)
+
+	roleName := ""
+	roleNameIfc, ok := req.Auth.InternalData["role_name"]
+	if ok {
+		roleName = roleNameIfc.(string)
+	}
 	if roleName == "" {
 		return nil, errors.New("error retrieving role_name during renewal")
 	}
@@ -169,7 +171,7 @@ func getCallerIdentity(header http.Header, rawURL string) (*sts.GetCallerIdentit
 	if response.StatusCode != 200 {
 		b, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			return nil, fmt.Errorf("error reading reponse body: %s", err)
+			return nil, fmt.Errorf("error reading response body: %s", err)
 		}
 		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
 	}
