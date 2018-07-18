@@ -2,9 +2,7 @@ package ali
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/logical"
@@ -16,7 +14,7 @@ func pathRole(b *backend) *framework.Path {
 		Pattern: "role/" + framework.GenericNameRegex("role"),
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
-				Type:        framework.TypeString,
+				Type:        framework.TypeLowerCaseString,
 				Description: "The name of the role as it should appear in Vault.",
 			},
 			"arn": {
@@ -81,14 +79,11 @@ func pathListRoles(b *backend) *framework.Path {
 func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	roleName := data.Get("role").(string)
-	if roleName == "" {
-		return nil, errors.New("missing role")
-	}
 
 	entry := &roleEntry{}
 	arn, err := parseARN(data.Get("arn").(string))
 	if err != nil {
-		return nil, fmt.Errorf("unable to parseARN arn %s: %s", arn, err)
+		return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
 	}
 	if roleName != arn.RoleName {
 		// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
@@ -122,7 +117,7 @@ func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request,
 // Establishes dichotomy of request operation between CreateOperation and UpdateOperation.
 // Returning 'true' forces an UpdateOperation, CreateOperation otherwise.
 func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
-	entry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("role").(string)))
+	entry, err := b.roleMgr.Read(ctx, req.Storage, data.Get("role").(string))
 	if err != nil {
 		return false, err
 	}
@@ -132,9 +127,6 @@ func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.
 func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	roleName := data.Get("role").(string)
-	if roleName == "" {
-		return nil, errors.New("missing role")
-	}
 
 	entry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
 	if err != nil {
@@ -151,17 +143,14 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 	if raw, ok := data.GetOk("arn"); ok {
 		arn, err := parseARN(raw.(string))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parseARN arn %s: %s", arn, err)
+			return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
 		}
 		if roleName != arn.RoleName {
 			// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
 			return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
 		}
 		if entry.ARN.Type != arnTypeRole {
-			// We haven't tested with other arn types and would like to understand and test these use cases before blindly
-			// granting access so we don't create a security vulnerability. Please open a ticket describing your use case
-			// for another arn type to get that started.
-			return nil, fmt.Errorf(`only role arn types are supported at this time, but %s was provided`, entry.ARN)
+			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
 		}
 		entry.ARN = arn
 	}
@@ -194,7 +183,7 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 }
 
 func (b *backend) operationRoleRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	entry, err := b.roleMgr.Read(ctx, req.Storage, strings.ToLower(data.Get("role").(string)))
+	entry, err := b.roleMgr.Read(ctx, req.Storage, data.Get("role").(string))
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +197,6 @@ func (b *backend) operationRoleRead(ctx context.Context, req *logical.Request, d
 
 func (b *backend) operationRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	roleName := data.Get("role").(string)
-	if roleName == "" {
-		return nil, errors.New("missing role")
-	}
 	return nil, b.roleMgr.Delete(ctx, req.Storage, roleName)
 }
 

@@ -2,8 +2,6 @@ package ali
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"sync"
 
 	"github.com/hashicorp/vault/logical"
@@ -14,9 +12,6 @@ type RoleManager struct {
 }
 
 func (m *RoleManager) Read(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	if roleName == "" {
-		return nil, errors.New("missing role name")
-	}
 	m.roleMutex.RLock()
 	defer m.roleMutex.RUnlock()
 	return m.getRole(ctx, s, roleName)
@@ -29,12 +24,6 @@ func (m *RoleManager) List(ctx context.Context, s logical.Storage) ([]string, er
 }
 
 func (m *RoleManager) Update(ctx context.Context, s logical.Storage, roleName string, roleEntry *roleEntry) error {
-	if roleName == "" {
-		return errors.New("missing role name")
-	}
-	if roleEntry == nil {
-		return errors.New("nil role entry")
-	}
 	m.roleMutex.Lock()
 	defer m.roleMutex.Unlock()
 	return m.setRole(ctx, s, roleName, roleEntry)
@@ -43,14 +32,11 @@ func (m *RoleManager) Update(ctx context.Context, s logical.Storage, roleName st
 func (m *RoleManager) Delete(ctx context.Context, s logical.Storage, roleName string) error {
 	m.roleMutex.Lock()
 	defer m.roleMutex.Unlock()
-	return s.Delete(ctx, "role/"+strings.ToLower(roleName))
+	return s.Delete(ctx, "role/"+roleName)
 }
 
 func (m *RoleManager) getRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	if roleName == "" {
-		return nil, errors.New("missing role name")
-	}
-	entry, err := s.Get(ctx, "role/"+strings.ToLower(roleName))
+	entry, err := s.Get(ctx, "role/"+roleName)
 	if err != nil {
 		return nil, err
 	}
@@ -65,13 +51,7 @@ func (m *RoleManager) getRole(ctx context.Context, s logical.Storage, roleName s
 }
 
 func (m *RoleManager) setRole(ctx context.Context, s logical.Storage, roleName string, roleEntry *roleEntry) error {
-	if roleName == "" {
-		return errors.New("missing role name")
-	}
-	if roleEntry == nil {
-		return errors.New("nil role entry")
-	}
-	entry, err := logical.StorageEntryJSON("role/"+strings.ToLower(roleName), roleEntry)
+	entry, err := logical.StorageEntryJSON("role/"+roleName, roleEntry)
 	if err != nil {
 		return err
 	}
