@@ -21,7 +21,7 @@ func pathLogin(b *backend) *framework.Path {
 		Fields: map[string]*framework.FieldSchema{
 			"identity_request_url": {
 				Type:        framework.TypeString,
-				Description: `Base64-encoded full URL against which to make the Alibaba request.`,
+				Description: "Base64-encoded full URL against which to make the Alibaba request.",
 			},
 			"identity_request_headers": {
 				Type: framework.TypeString,
@@ -70,7 +70,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parseARN entity's arn %s due to %s", callerIdentity.Arn, err)
+		return nil, fmt.Errorf("unable to parse entity's arn %s due to %s", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
 		return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", callerIdentity.Arn)
