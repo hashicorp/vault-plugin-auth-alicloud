@@ -16,3 +16,5 @@
 
 # The login binary that may be generated in the tools directory.
 tools/login/login
+
+pkg*
