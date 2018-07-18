@@ -45,14 +45,20 @@ if [ "${VAULT_DEV_BUILD}x" != "x" ]; then
     XC_OSARCH=$(go env GOOS)/$(go env GOARCH)
 fi
 
+# The main method we need for building is in the cmd directory
+cd "${DIR}/cmd/${TOOL}"
+
 # Build!
 echo "==> Building..."
 gox \
     -osarch="${XC_OSARCH}" \
     -ldflags "-X github.com/hashicorp/${TOOL}/version.GitCommit='${GIT_COMMIT}${GIT_DIRTY}'" \
-    -output "pkg/{{.OS}}_{{.Arch}}/${TOOL}" \
+    -output "${DIR}/pkg/{{.OS}}_{{.Arch}}/${TOOL}" \
     -tags="${BUILD_TAGS}" \
     .
+
+# Return to the home directory
+cd "$DIR"
 
 # Move all the compiled things to the $GOPATH/bin
 OLDIFS=$IFS
