@@ -165,7 +165,7 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 		entry.MaxTTL = time.Duration(raw.(int)) * time.Second
 	}
 	if entry.TTL > entry.MaxTTL {
-		return nil, fmt.Errorf("ttl exceeds max_ttl")
+		return nil, fmt.Errorf("ttl should be shorter than max_ttl")
 	}
 
 	if raw, ok := data.GetOk("period"); ok {

@@ -61,10 +61,10 @@ Configuration:
 	  Explicit Alibaba region
 
   mount=<string>
-      Path where the AWS credential method is mounted. This is usually provided
+      Path where the Alibaba credential method is mounted. This is usually provided
       via the -path flag in the "vault login" command, but it can be specified
       here as well. If specified here, it takes precedence over the value for
-      -path. The default value is "aws".
+      -path. The default value is "alibaba".
 
   role=<string>
       Name of the role to request a token against

@@ -5,13 +5,13 @@ import (
 )
 
 func TestParseRoleArn(t *testing.T) {
-	arn := "acs:ram::5128828231865463:role/elk"
+	arn := "acs:ram::5138828231865461:role/elk"
 	result, err := parseARN(arn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.AccountNumber != "5128828231865463" {
-		t.Fatalf("got %s but expected %s", result.AccountNumber, "5128828231865463")
+	if result.AccountNumber != "5138828231865461" {
+		t.Fatalf("got %s but expected %s", result.AccountNumber, "5138828231865461")
 	}
 	if result.Type != arnTypeRole {
 		t.Fatalf("got %d but expected %d", result.Type, arnTypeRole)
@@ -25,13 +25,13 @@ func TestParseRoleArn(t *testing.T) {
 }
 
 func TestParseAssumedRoleArn(t *testing.T) {
-	arn := "acs:ram::5128828231865463:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q"
+	arn := "acs:ram::5138828231865461:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q"
 	result, err := parseARN(arn)
 	if err != nil {
 		panic(err)
 	}
-	if result.AccountNumber != "5128828231865463" {
-		t.Fatalf("got %s but expected %s", result.AccountNumber, "5128828231865463")
+	if result.AccountNumber != "5138828231865461" {
+		t.Fatalf("got %s but expected %s", result.AccountNumber, "5138828231865461")
 	}
 	if result.Type != arnTypeAssumedRole {
 		t.Fatalf("got %d but expected %d", result.Type, arnTypeAssumedRole)

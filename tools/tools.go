@@ -33,9 +33,11 @@ func GenerateLoginData(accessKeyID, accessKeySecret, securityToken, region strin
 		return nil, err
 	}
 
-	if _, err := client.GetCallerIdentity(sts.CreateGetCallerIdentityRequest()); err != nil {
-		// This is expected because it's thrown from the RequestCapturer's Proxy method.
-	}
+	// This method returns a response and an error. We're ignoring both because the response
+	// will always be nil here, and the error will always be the error thrown by the Proxy
+	// method below. We don't care about either of them, we just care about firing the request
+	// so we can capture it on the way out and retrieve it for further use.
+	client.GetCallerIdentity(sts.CreateGetCallerIdentityRequest())
 
 	getCallerIdentityRequest, err := capturer.GetCapturedRequest()
 	if err != nil {
