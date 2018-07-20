@@ -2,56 +2,41 @@ package ali
 
 import (
 	"context"
-	"sync"
 
 	"github.com/hashicorp/vault/logical"
 )
 
+func NewRoleManager() *RoleManager {
+	return &RoleManager{
+		prefix: "role/",
+	}
+}
+
 type RoleManager struct {
-	roleMutex sync.RWMutex
+	prefix string
 }
 
-func (m *RoleManager) Read(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	m.roleMutex.RLock()
-	defer m.roleMutex.RUnlock()
-	return m.getRole(ctx, s, roleName)
-}
-
-func (m *RoleManager) List(ctx context.Context, s logical.Storage) ([]string, error) {
-	m.roleMutex.RLock()
-	defer m.roleMutex.RUnlock()
-	return s.List(ctx, "role/")
-}
-
-func (m *RoleManager) Update(ctx context.Context, s logical.Storage, roleName string, roleEntry *roleEntry) error {
-	m.roleMutex.Lock()
-	defer m.roleMutex.Unlock()
-	return m.setRole(ctx, s, roleName, roleEntry)
-}
-
-func (m *RoleManager) Delete(ctx context.Context, s logical.Storage, roleName string) error {
-	m.roleMutex.Lock()
-	defer m.roleMutex.Unlock()
-	return s.Delete(ctx, "role/"+roleName)
-}
-
-func (m *RoleManager) getRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
-	entry, err := s.Get(ctx, "role/"+roleName)
+func (r *RoleManager) Read(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
+	entry, err := s.Get(ctx, r.prefix+roleName)
 	if err != nil {
 		return nil, err
 	}
 	if entry == nil {
 		return nil, nil
 	}
-	var result roleEntry
-	if err := entry.DecodeJSON(&result); err != nil {
+	result := &roleEntry{}
+	if err := entry.DecodeJSON(result); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return result, nil
 }
 
-func (m *RoleManager) setRole(ctx context.Context, s logical.Storage, roleName string, roleEntry *roleEntry) error {
-	entry, err := logical.StorageEntryJSON("role/"+roleName, roleEntry)
+func (r *RoleManager) List(ctx context.Context, s logical.Storage) ([]string, error) {
+	return s.List(ctx, r.prefix)
+}
+
+func (r *RoleManager) Update(ctx context.Context, s logical.Storage, roleName string, roleEntry *roleEntry) error {
+	entry, err := logical.StorageEntryJSON(r.prefix+roleName, roleEntry)
 	if err != nil {
 		return err
 	}
@@ -59,4 +44,8 @@ func (m *RoleManager) setRole(ctx context.Context, s logical.Storage, roleName s
 		return err
 	}
 	return nil
+}
+
+func (r *RoleManager) Delete(ctx context.Context, s logical.Storage, roleName string) error {
+	return s.Delete(ctx, r.prefix+roleName)
 }

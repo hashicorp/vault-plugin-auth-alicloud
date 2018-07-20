@@ -9,7 +9,7 @@ import (
 
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	b := &backend{
-		roleMgr: &RoleManager{},
+		roleMgr: NewRoleManager(),
 	}
 	b.Backend = &framework.Backend{
 		AuthRenew: b.pathLoginRenew,
