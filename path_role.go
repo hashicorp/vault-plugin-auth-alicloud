@@ -2,6 +2,7 @@ package ali
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -44,8 +45,8 @@ each renewal, the token's TTL will be set to the value of this parameter.`,
 		},
 		ExistenceCheck: b.operationRoleExistenceCheck,
 		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.CreateOperation: b.operationRoleCreate,
-			logical.UpdateOperation: b.operationRoleUpdate,
+			logical.CreateOperation: b.operationRoleCreateUpdate,
+			logical.UpdateOperation: b.operationRoleCreateUpdate,
 			logical.ReadOperation:   b.operationRoleRead,
 			logical.DeleteOperation: b.operationRoleDelete,
 		},
@@ -76,44 +77,6 @@ func pathListRoles(b *backend) *framework.Path {
 	}
 }
 
-func (b *backend) operationRoleCreate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-
-	roleName := data.Get("role").(string)
-
-	entry := &roleEntry{}
-	arn, err := parseARN(data.Get("arn").(string))
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
-	}
-	if roleName != arn.RoleName {
-		// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
-		return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
-	}
-	if arn.Type != arnTypeRole {
-		return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
-	}
-
-	entry.ARN = arn
-	entry.Policies = data.Get("policies").([]string)
-	entry.TTL = time.Duration(data.Get("ttl").(int)) * time.Second
-	entry.MaxTTL = time.Duration(data.Get("max_ttl").(int)) * time.Second
-	entry.Period = time.Duration(data.Get("period").(int)) * time.Second
-
-	if entry.TTL > entry.MaxTTL {
-		return nil, fmt.Errorf("ttl exceeds max_ttl")
-	}
-
-	if err := b.roleMgr.Update(ctx, req.Storage, roleName, entry); err != nil {
-		return nil, err
-	}
-	if entry.TTL > b.System().MaxLeaseTTL() {
-		resp := &logical.Response{}
-		resp.AddWarning(fmt.Sprintf("ttl of %d exceeds the system max ttl of %d, the latter will be used during login", entry.TTL, b.System().MaxLeaseTTL()))
-		return resp, nil
-	}
-	return nil, nil
-}
-
 // Establishes dichotomy of request operation between CreateOperation and UpdateOperation.
 // Returning 'true' forces an UpdateOperation, CreateOperation otherwise.
 func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
@@ -124,7 +87,7 @@ func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.
 	return entry != nil, nil
 }
 
-func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
 	roleName := data.Get("role").(string)
 
@@ -132,12 +95,10 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 	if err != nil {
 		return nil, err
 	}
-	if entry == nil {
-		// This should be an error because it's possible for the existence check to return that a role exists,
-		// then for a separate process to delete it, and then for the original existence-checker to arrive here
-		// and have nothing to update. In that case, defaulting would create a result that would be unexpected
-		// to the caller.
+	if entry == nil && req.Operation == logical.UpdateOperation {
 		return nil, fmt.Errorf("no entry found to update for %s", roleName)
+	} else if entry == nil {
+		entry = &roleEntry{}
 	}
 
 	if raw, ok := data.GetOk("arn"); ok {
@@ -149,27 +110,30 @@ func (b *backend) operationRoleUpdate(ctx context.Context, req *logical.Request,
 			// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
 			return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
 		}
-		if entry.ARN.Type != arnTypeRole {
+		if arn.Type != arnTypeRole {
 			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
 		}
 		entry.ARN = arn
+	} else if !ok && req.Operation == logical.CreateOperation {
+		return nil, errors.New("the arn is required to create a role")
 	}
+
+	// None of the remaining fields are required.
 	if raw, ok := data.GetOk("policies"); ok {
 		entry.Policies = raw.([]string)
 	}
-
 	if raw, ok := data.GetOk("ttl"); ok {
 		entry.TTL = time.Duration(raw.(int)) * time.Second
 	}
 	if raw, ok := data.GetOk("max_ttl"); ok {
 		entry.MaxTTL = time.Duration(raw.(int)) * time.Second
 	}
-	if entry.TTL > entry.MaxTTL {
-		return nil, fmt.Errorf("ttl should be shorter than max_ttl")
-	}
-
 	if raw, ok := data.GetOk("period"); ok {
 		entry.Period = time.Duration(raw.(int)) * time.Second
+	}
+
+	if entry.MaxTTL > 0 && entry.TTL > entry.MaxTTL {
+		return nil, fmt.Errorf("ttl exceeds max_ttl")
 	}
 	if err := b.roleMgr.Update(ctx, req.Storage, roleName, entry); err != nil {
 		return nil, err

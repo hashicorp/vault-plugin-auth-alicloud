@@ -63,7 +63,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, errors.New("nil response when parsing identity_request_headers")
 	}
 
-	callerIdentity, err := getCallerIdentity(headers, string(identityReqUrl))
+	callerIdentity, err := b.getCallerIdentity(headers, string(identityReqUrl))
 	if err != nil {
 		return nil, fmt.Errorf("error making upstream request: %v", err)
 	}
@@ -73,7 +73,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("unable to parse entity's arn %s due to %s", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
-		return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", callerIdentity.Arn)
+		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole.String(), parsedARN.Type.String())
 	}
 
 	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, parsedARN.RoleName)
@@ -118,9 +118,14 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 }
 
 func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	// The arn set in metadata earlier is the assumed-role arn.
 	arn := req.Auth.Metadata["arn"]
 	if arn == "" {
 		return nil, errors.New("unable to retrieve arn from metadata during renewal")
+	}
+	parsedARN, err := parseARN(arn)
+	if err != nil {
+		return nil, err
 	}
 
 	roleName := ""
@@ -140,7 +145,7 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data
 		return nil, errors.New("role entry not found")
 	}
 
-	if roleEntry.ARN.String() != arn {
+	if !parsedARN.IsMemberOf(roleEntry.ARN) {
 		return nil, errors.New("the caller's arn does not match the role's arn")
 	}
 
@@ -151,18 +156,30 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data
 	return resp, nil
 }
 
-func getCallerIdentity(header http.Header, rawURL string) (*sts.GetCallerIdentityResponse, error) {
+func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.GetCallerIdentityResponse, error) {
+	/*
+		Here we need to ensure we're actually hitting the AliCloud service, and that the caller didn't
+		inject a URL to their own service that will respond as desired.
+	*/
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "https" {
+		return nil, fmt.Errorf(`expected "https" url scheme but received "%s"`, u.Scheme)
+	}
+	if u.Host != "sts.aliyuncs.com" {
+		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
+	}
+	// TODO format must be json to be able to read the response, any other things I should check through?
+
 	request, err := http.NewRequest(http.MethodPost, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	request.Header = header
 
-	// Other clients are available but this one is used because it matches what Alibaba's
-	// Go SDK uses and we're trying to match as closely as possible.
-	client := &http.Client{}
-
-	response, err := client.Do(request)
+	response, err := b.getCallerIdentityClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %s", err)
 	}
