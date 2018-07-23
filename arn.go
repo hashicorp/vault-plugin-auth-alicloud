@@ -11,7 +11,7 @@ func parseARN(a string) (*arn, error) {
 		return nil, errors.New("no arn provided")
 	}
 
-	// Example: "acs:ram::5128828231865463:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q"
+	// Example: "acs:ram::5138828231865461:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q"
 	parsed := &arn{
 		Full: a,
 	}
