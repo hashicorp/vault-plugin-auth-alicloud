@@ -171,7 +171,13 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if u.Host != "sts.aliyuncs.com" {
 		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
 	}
-	// TODO format must be json to be able to read the response, any other things I should check through?
+	q := u.Query()
+	if q.Get("Format") != "JSON" {
+		return nil, fmt.Errorf("query Format must be JSON but received %s", q.Get("Format"))
+	}
+	if q.Get("Action") != "GetCallerIdentity" {
+		return nil, fmt.Errorf("query Action must be GetCallerIdentity but received %s", q.Get("Action"))
+	}
 
 	request, err := http.NewRequest(http.MethodPost, rawURL, nil)
 	if err != nil {
