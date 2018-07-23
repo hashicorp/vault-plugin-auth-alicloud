@@ -114,7 +114,7 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
 		}
 		entry.ARN = arn
-	} else if !ok && req.Operation == logical.CreateOperation {
+	} else if req.Operation == logical.CreateOperation {
 		return nil, errors.New("the arn is required to create a role")
 	}
 
