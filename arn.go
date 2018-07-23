@@ -39,7 +39,7 @@ func parseARN(a string) (*arn, error) {
 	case "role":
 		parsed.Type = arnTypeRole
 	default:
-		return &arn{}, fmt.Errorf("unsupported parsed type: %s", entityType)
+		return nil, fmt.Errorf("unsupported parsed type: %s", entityType)
 	}
 
 	parsed.RoleName = roleFields[1]
@@ -50,6 +50,17 @@ func parseARN(a string) (*arn, error) {
 }
 
 type arnType int
+
+func (t arnType) String() string {
+	switch t {
+	case arnTypeRole:
+		return "role"
+	case arnTypeAssumedRole:
+		return "assumed-role"
+	default:
+		return ""
+	}
+}
 
 const (
 	arnTypeRole arnType = iota

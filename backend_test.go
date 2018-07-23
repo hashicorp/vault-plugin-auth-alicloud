@@ -1,56 +1,40 @@
 package ali
 
 import (
+	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"errors"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
-	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
-	"github.com/hashicorp/vault-plugin-auth-alibaba/tools"
-	"github.com/hashicorp/vault/logical"
+	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/vault-plugin-auth-alibaba/tools"
+	"github.com/hashicorp/vault/logical"
 )
 
 var (
 	testCtx     = context.Background()
 	testStorage = &logical.InmemStorage{}
 	testBackend = func() logical.Backend {
+		client := cleanhttp.DefaultClient()
+		client.Transport = &fauxRoundTripper{}
+		b := newBackend(client)
 		conf := &logical.BackendConfig{
 			System: &logical.StaticSystemView{
 				DefaultLeaseTTLVal: time.Hour,
 				MaxLeaseTTLVal:     time.Hour,
 			},
 		}
-		b, err := Factory(testCtx, conf)
-		if err != nil {
+		if err := b.Setup(testCtx, conf); err != nil {
 			panic(err)
 		}
 		return b
 	}()
-	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := `{
-			"RequestId": "2C9BE469-4A35-44D5-9529-CAA280B11603",
-			"AccountId": "1968132000123456",
-			"UserId": "216959339000654321",
-			"AccountId": "5128828231865463",
-			"RoleId": "1234",
-			"Arn": "acs:ram::5128828231865463:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q",
-			"IdentityType": "assumed-role",
-			"PrincipalId": "vm-ram-i-rj978rorvlg76urhqh7q"
-		}`
-		w.Write([]byte(response))
-	}))
 )
 
 func TestBackend(t *testing.T) {
-	defer testServer.Close()
-
 	// Exercise all the role endpoints.
 	t.Run("EmptyList", EmptyList)
 	t.Run("CreateRole", CreateRole)
@@ -222,7 +206,7 @@ func ListOfOne(t *testing.T) {
 }
 
 func LoginSuccess(t *testing.T) {
-	data, err := generateLoginData(testServer.URL, "accessKeyID", "accessKeySecret", "securityToken", "us-west-2")
+	data, err := tools.GenerateLoginData("accessKeyID", "accessKeySecret", "securityToken", "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,55 +279,26 @@ func LoginSuccess(t *testing.T) {
 	}
 }
 
-// generateLoginData is just like GenerateLoginData in the tools package,
-// but it allows you to inject a testURL for a local http test server
-// so the request can be intercepted and the response can be spoofed.
-func generateLoginData(testURL, accessKeyID, accessKeySecret, securityToken, region string) (map[string]interface{}, error) {
-	creds := credentials.NewStsTokenCredential(accessKeyID, accessKeySecret, securityToken)
+type fauxRoundTripper struct{}
 
-	config := sdk.NewConfig()
-
-	// This call always must be https but the config doesn't default to that.
-	config.Scheme = "https"
-
-	// Prepare to record the request using a proxy that will capture it and throw an error so it's not executed.
-	capturer := &tools.RequestCapturer{}
-	transport := &http.Transport{}
-	transport.Proxy = capturer.Proxy
-	config.HttpTransport = transport
-
-	client, err := sts.NewClientWithOptions(region, config, creds)
+// This simply returns a spoofed successful response from the GetCallerIdentity endpoint.
+func (f *fauxRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	respBody := map[string]string{
+		"RequestId":    "2C9BE469-4A35-44D5-9529-CAA280B11603",
+		"UserId":       "216959339000654321",
+		"AccountId":    "5128828231865463",
+		"RoleId":       "1234",
+		"Arn":          "acs:ram::5128828231865463:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q",
+		"IdentityType": "assumed-role",
+		"PrincipalId":  "vm-ram-i-rj978rorvlg76urhqh7q",
+	}
+	b, err := json.Marshal(respBody)
 	if err != nil {
 		return nil, err
 	}
-
-	if _, err := client.GetCallerIdentity(sts.CreateGetCallerIdentityRequest()); err != nil {
-		// This is expected because it's thrown from the RequestCapturer's Proxy method.
+	resp := &http.Response{
+		Body:       ioutil.NopCloser(bytes.NewReader(b)),
+		StatusCode: 200,
 	}
-
-	getCallerIdentityRequest, err := capturer.GetCapturedRequest()
-	if err != nil {
-		return nil, err
-	}
-
-	// This is where the magic happens and we inject the test server's URL,
-	// which will be where Vault ultimately sends the login request.
-	realBaseUrl := "https://sts.aliyuncs.com"
-	rawUrl := getCallerIdentityRequest.URL.String()
-	if !strings.Contains(rawUrl, realBaseUrl) {
-		return nil, errors.New("the getCallerIdentityRequest base URL has changed so this test needs to be updated or it will fire real requests")
-	} else {
-		rawUrl = strings.Replace(rawUrl, realBaseUrl, testURL, -1)
-	}
-
-	u := base64.StdEncoding.EncodeToString([]byte(rawUrl))
-	b, err := json.Marshal(getCallerIdentityRequest.Header)
-	if err != nil {
-		return nil, err
-	}
-	headers := base64.StdEncoding.EncodeToString(b)
-	return map[string]interface{}{
-		"identity_request_url":     u,
-		"identity_request_headers": headers,
-	}, nil
+	return resp, nil
 }
