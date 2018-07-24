@@ -31,7 +31,11 @@
 
 [[constraint]]
   branch = "master"
-  name = "github.com/hashicorp/go-hclog"
+  name = "github.com/hashicorp/go-cleanhttp"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/hashicorp/go-sockaddr"
 
 [[constraint]]
   name = "github.com/hashicorp/vault"
