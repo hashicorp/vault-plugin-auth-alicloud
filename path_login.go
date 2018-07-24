@@ -12,9 +12,9 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
+	"github.com/hashicorp/vault/helper/cidrutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
-	"github.com/hashicorp/vault/helper/cidrutil"
 )
 
 func pathLogin(b *backend) *framework.Path {
@@ -118,7 +118,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 			Alias: &logical.Alias{
 				Name: callerIdentity.PrincipalId,
 			},
-			BoundCIDRs:role.BoundCIDRs,
+			BoundCIDRs: role.BoundCIDRs,
 		},
 	}, nil
 }
