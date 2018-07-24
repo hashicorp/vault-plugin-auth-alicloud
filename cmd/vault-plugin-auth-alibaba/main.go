@@ -18,7 +18,7 @@ func main() {
 	tlsProviderFunc := pluginutil.VaultPluginTLSProvider(tlsConfig)
 
 	err := plugin.Serve(&plugin.ServeOpts{
-		BackendFactoryFunc: ali.Factory,
+		BackendFactoryFunc: alicloud.Factory,
 		TLSProviderFunc:    tlsProviderFunc,
 	})
 	if err != nil {
