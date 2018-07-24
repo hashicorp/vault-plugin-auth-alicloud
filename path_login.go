@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -73,7 +74,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("unable to parse entity's arn %s due to %s", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
-		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole.String(), parsedARN.Type.String())
+		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
 	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, parsedARN.RoleName)
@@ -168,7 +169,11 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf(`expected "https" url scheme but received "%s"`, u.Scheme)
 	}
-	if u.Host != "sts.aliyuncs.com" {
+	stsEndpoint, err := getSTSEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	if u.Host != stsEndpoint {
 		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
 	}
 	q := u.Query()
@@ -204,6 +209,23 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 		return nil, fmt.Errorf("error decoding response: %s", err)
 	}
 	return result, nil
+}
+
+func getSTSEndpoint() (string, error) {
+	r := &endpoints.LocalGlobalResolver{}
+	endpoint, supported, err := r.TryResolve(&endpoints.ResolveParam{
+		Product: "sts",
+	})
+	if err != nil {
+		return "", err
+	}
+	if !supported {
+		return "", errors.New("sts endpoint is no longer supported")
+	}
+	if endpoint != "sts.aliyuncs.com" {
+		return "", fmt.Errorf("got an unexpected endpoint: %s", endpoint)
+	}
+	return endpoint, nil
 }
 
 func parseHeaders(b64Header string) (http.Header, error) {
