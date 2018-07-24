@@ -77,12 +77,11 @@
   revision = "d5fe4b57a186c716b0e00b8c301cbd9b4182694d"
 
 [[projects]]
-  branch = "master"
-  digest = "1:e8d99882caa8c74d68f340ddb9bba3f7e433117ce57c3e52501edfa7e195d2c7"
+  digest = "1:39e3c6a08d969bd30057f542ef0bdc08db97c04e708a61bb0a774b320a7296b2"
   name = "github.com/hashicorp/go-hclog"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ff2cf002a8dd750586d91dddd4470c341f981fe1"
+  revision = "69ff559dc25f3b435631604f573a5fa1efdb6433"
 
 [[projects]]
   branch = "master"
@@ -123,11 +122,12 @@
   revision = "6bb64b370b90e7ef1fa532be9e591a81c3493e00"
 
 [[projects]]
-  digest = "1:81e713f14fa060eacffd31a0be4a7c3bac5ac9895095ca1945009b9ab1d3ab88"
+  branch = "master"
+  digest = "1:14f2005c31ddf99c4a0f36fc440f8d1ac43224194c7c4a904b3c8f4ba5654d0b"
   name = "github.com/hashicorp/go-sockaddr"
   packages = ["."]
   pruneopts = "UT"
-  revision = "7165ee14aff120ee3642aa2bcf2dea8eebef29c3"
+  revision = "6d291a969b86c4b633730bfc6b8b9d64c3aafed9"
 
 [[projects]]
   digest = "1:b8edba99399cf7b4140dd74c9b942ab65155f02f08cccf2cf8246eb692bc5d4b"
@@ -172,11 +172,12 @@
   revision = "f40e974e75af4e271d97ce0fc917af5898ae7bda"
 
 [[projects]]
-  digest = "1:dd9711b691275aea497c594b96c5e7115ab6832e4fdc25d1766fe4d63f1170ef"
+  digest = "1:0f71e8e3766e4a9ebcb8878abaa4b5599f809225b4ec52c82d50296ec43c054f"
   name = "github.com/hashicorp/vault"
   packages = [
     "api",
     "helper/certutil",
+    "helper/cidrutil",
     "helper/compressutil",
     "helper/consts",
     "helper/errutil",
@@ -291,20 +292,19 @@
   version = "v1.2.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:2ecf3b54e00300787e7499605a787d616b2b22fda16fa8a125c692aa2c6962c2"
+  digest = "1:7d68173c25f7e56987596700421ae9cd87d6f7dc745e0a1de5dae37683611acb"
   name = "golang.org/x/net"
   packages = [
     "context",
-    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
     "internal/timeseries",
+    "lex/httplex",
     "trace",
   ]
   pruneopts = "UT"
-  revision = "81d44fd177a98d09fe3bc40a5a78d495d3f042ea"
+  revision = "f5dfe339be1d06f81b22525fe34671ee7d2c8904"
 
 [[projects]]
   digest = "1:ba7d5e85e8b4f084fae02a1a9d7462980e889d1eb689c747507b30a30b8bfa67"
@@ -350,7 +350,7 @@
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "fedd2861243fd1a8152376292b921b394c7bef7e"
+  revision = "02b4e95473316948020af0b7a4f0f22c73929b0e"
 
 [[projects]]
   digest = "1:3f0daa1176772835d89c92fe1153eb007cf70671e81ace72335ad3f9c224c837"
@@ -391,9 +391,14 @@
   input-imports = [
     "github.com/aliyun/alibaba-cloud-sdk-go/sdk",
     "github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials",
+    "github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints",
     "github.com/aliyun/alibaba-cloud-sdk-go/services/sts",
+    "github.com/hashicorp/go-cleanhttp",
     "github.com/hashicorp/go-hclog",
+    "github.com/hashicorp/go-sockaddr",
     "github.com/hashicorp/vault/api",
+    "github.com/hashicorp/vault/helper/cidrutil",
+    "github.com/hashicorp/vault/helper/parseutil",
     "github.com/hashicorp/vault/helper/pluginutil",
     "github.com/hashicorp/vault/logical",
     "github.com/hashicorp/vault/logical/framework",
