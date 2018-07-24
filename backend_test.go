@@ -57,11 +57,12 @@ func CreateRole(t *testing.T) {
 		Path:      "role/elk",
 		Storage:   testStorage,
 		Data: map[string]interface{}{
-			"arn":      "acs:ram::5138828231865461:role/elk",
-			"policies": "logstash",
-			"ttl":      10,
-			"max_ttl":  10,
-			"period":   1,
+			"arn":         "acs:ram::5138828231865461:role/elk",
+			"policies":    "logstash",
+			"ttl":         10,
+			"max_ttl":     10,
+			"period":      1,
+			"bound_cidrs": []string{"127.0.0.1/24"},
 		},
 	}
 	resp, err := testBackend.HandleRequest(testCtx, req)
@@ -215,6 +216,9 @@ func LoginSuccess(t *testing.T) {
 		Path:      "login",
 		Storage:   testStorage,
 		Data:      data,
+		Connection: &logical.Connection{
+			RemoteAddr: "127.0.0.1/24",
+		},
 	}
 	resp, err := testBackend.HandleRequest(testCtx, req)
 	if err != nil {
