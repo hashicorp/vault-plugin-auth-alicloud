@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/hashicorp/vault/helper/parseutil"
 )
 
 func pathRole(b *backend) *framework.Path {
@@ -41,6 +42,11 @@ to 0, in which case the value will fallback to the system/mount defaults.`,
 If set, indicates that the token generated using this role should never expire.
 The token should be renewed within the duration specified by this value. At
 each renewal, the token's TTL will be set to the value of this parameter.`,
+			},
+			"bound_cidrs": {
+				Type: framework.TypeCommaStringSlice,
+				Description: `Comma separated string or list of CIDR blocks. If set, specifies the blocks of
+IP addresses which can perform the login operation.`,
 			},
 		},
 		ExistenceCheck: b.operationRoleExistenceCheck,
@@ -131,6 +137,11 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 	if raw, ok := data.GetOk("period"); ok {
 		role.Period = time.Duration(raw.(int)) * time.Second
 	}
+	boundCIDRs, err := parseutil.ParseAddrs(data.Get("bound_cidrs"))
+	if err != nil {
+		return nil, err
+	}
+	role.BoundCIDRs = boundCIDRs
 
 	if role.MaxTTL > 0 && role.TTL > role.MaxTTL {
 		return nil, fmt.Errorf("ttl exceeds max_ttl")

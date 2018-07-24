@@ -14,6 +14,7 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
+	"github.com/hashicorp/vault/helper/cidrutil"
 )
 
 func pathLogin(b *backend) *framework.Path {
@@ -85,6 +86,9 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("entry for role %s not found", parsedARN.RoleName)
 	}
 
+	if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
+		return nil, errors.New("login request originated from invalid CIDR")
+	}
 	if !parsedARN.IsMemberOf(role.ARN) {
 		return nil, errors.New("the caller's arn does not match the role's arn")
 	}
@@ -114,6 +118,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 			Alias: &logical.Alias{
 				Name: callerIdentity.PrincipalId,
 			},
+			BoundCIDRs:role.BoundCIDRs,
 		},
 	}, nil
 }
