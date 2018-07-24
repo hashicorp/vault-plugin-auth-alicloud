@@ -1,4 +1,4 @@
-package ali
+package alicloud
 
 import (
 	"context"
@@ -77,21 +77,21 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
-	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, parsedARN.RoleName)
+	role, err := readRole(ctx, req.Storage, parsedARN.RoleName)
 	if err != nil {
 		return nil, err
 	}
-	if roleEntry == nil {
+	if role == nil {
 		return nil, fmt.Errorf("entry for role %s not found", parsedARN.RoleName)
 	}
 
-	if !parsedARN.IsMemberOf(roleEntry.ARN) {
+	if !parsedARN.IsMemberOf(role.ARN) {
 		return nil, errors.New("the caller's arn does not match the role's arn")
 	}
 	return &logical.Response{
 		Auth: &logical.Auth{
-			Period:   roleEntry.Period,
-			Policies: roleEntry.Policies,
+			Period:   role.Period,
+			Policies: role.Policies,
 			Metadata: map[string]string{
 				"account_id":    callerIdentity.AccountId,
 				"user_id":       callerIdentity.UserId,
@@ -108,8 +108,8 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 			DisplayName: callerIdentity.PrincipalId,
 			LeaseOptions: logical.LeaseOptions{
 				Renewable: true,
-				TTL:       roleEntry.TTL,
-				MaxTTL:    roleEntry.MaxTTL,
+				TTL:       role.TTL,
+				MaxTTL:    role.MaxTTL,
 			},
 			Alias: &logical.Alias{
 				Name: callerIdentity.PrincipalId,
@@ -138,22 +138,22 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data
 		return nil, errors.New("error retrieving role_name during renewal")
 	}
 
-	roleEntry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
+	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
-	if roleEntry == nil {
+	if role == nil {
 		return nil, errors.New("role entry not found")
 	}
 
-	if !parsedARN.IsMemberOf(roleEntry.ARN) {
+	if !parsedARN.IsMemberOf(role.ARN) {
 		return nil, errors.New("the caller's arn does not match the role's arn")
 	}
 
 	resp := &logical.Response{Auth: req.Auth}
-	resp.Auth.TTL = roleEntry.TTL
-	resp.Auth.MaxTTL = roleEntry.MaxTTL
-	resp.Auth.Period = roleEntry.Period
+	resp.Auth.TTL = role.TTL
+	resp.Auth.MaxTTL = role.MaxTTL
+	resp.Auth.Period = role.Period
 	return resp, nil
 }
 
@@ -190,7 +190,7 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	}
 	request.Header = header
 
-	response, err := b.getCallerIdentityClient.Do(request)
+	response, err := b.identityClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %s", err)
 	}

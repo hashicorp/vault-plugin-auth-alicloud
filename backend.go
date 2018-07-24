@@ -1,4 +1,4 @@
-package ali
+package alicloud
 
 import (
 	"context"
@@ -24,8 +24,7 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 // newBackend exists for testability. It allows us to inject a fake client.
 func newBackend(client *http.Client) *backend {
 	b := &backend{
-		getCallerIdentityClient: client,
-		roleMgr:                 NewRoleManager(),
+		identityClient: client,
 	}
 	b.Backend = &framework.Backend{
 		AuthRenew: b.pathLoginRenew,
@@ -49,8 +48,7 @@ func newBackend(client *http.Client) *backend {
 type backend struct {
 	*framework.Backend
 
-	getCallerIdentityClient *http.Client
-	roleMgr                 *RoleManager
+	identityClient *http.Client
 }
 
 const backendHelp = `

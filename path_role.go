@@ -1,4 +1,4 @@
-package ali
+package alicloud
 
 import (
 	"context"
@@ -80,7 +80,7 @@ func pathListRoles(b *backend) *framework.Path {
 // Establishes dichotomy of request operation between CreateOperation and UpdateOperation.
 // Returning 'true' forces an UpdateOperation, CreateOperation otherwise.
 func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.Request, data *framework.FieldData) (bool, error) {
-	entry, err := b.roleMgr.Read(ctx, req.Storage, data.Get("role").(string))
+	entry, err := readRole(ctx, req.Storage, data.Get("role").(string))
 	if err != nil {
 		return false, err
 	}
@@ -91,14 +91,14 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 
 	roleName := data.Get("role").(string)
 
-	entry, err := b.roleMgr.Read(ctx, req.Storage, roleName)
+	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
-	if entry == nil && req.Operation == logical.UpdateOperation {
-		return nil, fmt.Errorf("no entry found to update for %s", roleName)
-	} else if entry == nil {
-		entry = &roleEntry{}
+	if role == nil && req.Operation == logical.UpdateOperation {
+		return nil, fmt.Errorf("no role found to update for %s", roleName)
+	} else if role == nil {
+		role = &roleEntry{}
 	}
 
 	if raw, ok := data.GetOk("arn"); ok {
@@ -111,65 +111,88 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 			return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
 		}
 		if arn.Type != arnTypeRole {
-			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", entry.ARN)
+			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", role.ARN)
 		}
-		entry.ARN = arn
+		role.ARN = arn
 	} else if req.Operation == logical.CreateOperation {
 		return nil, errors.New("the arn is required to create a role")
 	}
 
 	// None of the remaining fields are required.
 	if raw, ok := data.GetOk("policies"); ok {
-		entry.Policies = raw.([]string)
+		role.Policies = raw.([]string)
 	}
 	if raw, ok := data.GetOk("ttl"); ok {
-		entry.TTL = time.Duration(raw.(int)) * time.Second
+		role.TTL = time.Duration(raw.(int)) * time.Second
 	}
 	if raw, ok := data.GetOk("max_ttl"); ok {
-		entry.MaxTTL = time.Duration(raw.(int)) * time.Second
+		role.MaxTTL = time.Duration(raw.(int)) * time.Second
 	}
 	if raw, ok := data.GetOk("period"); ok {
-		entry.Period = time.Duration(raw.(int)) * time.Second
+		role.Period = time.Duration(raw.(int)) * time.Second
 	}
 
-	if entry.MaxTTL > 0 && entry.TTL > entry.MaxTTL {
+	if role.MaxTTL > 0 && role.TTL > role.MaxTTL {
 		return nil, fmt.Errorf("ttl exceeds max_ttl")
 	}
-	if err := b.roleMgr.Update(ctx, req.Storage, roleName, entry); err != nil {
+
+	entry, err := logical.StorageEntryJSON("role/"+roleName, role)
+	if err != nil {
 		return nil, err
 	}
-	if entry.TTL > b.System().MaxLeaseTTL() {
+	if err := req.Storage.Put(ctx, entry); err != nil {
+		return nil, err
+	}
+
+	if role.TTL > b.System().MaxLeaseTTL() {
 		resp := &logical.Response{}
-		resp.AddWarning(fmt.Sprintf("ttl of %d exceeds the system max ttl of %d, the latter will be used during login", entry.TTL, b.System().MaxLeaseTTL()))
+		resp.AddWarning(fmt.Sprintf("ttl of %d exceeds the system max ttl of %d, the latter will be used during login", role.TTL, b.System().MaxLeaseTTL()))
 		return resp, nil
 	}
 	return nil, nil
 }
 
 func (b *backend) operationRoleRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	entry, err := b.roleMgr.Read(ctx, req.Storage, data.Get("role").(string))
+	role, err := readRole(ctx, req.Storage, data.Get("role").(string))
 	if err != nil {
 		return nil, err
 	}
-	if entry == nil {
+	if role == nil {
 		return nil, nil
 	}
 	return &logical.Response{
-		Data: entry.ToResponseData(),
+		Data: role.ToResponseData(),
 	}, nil
 }
 
 func (b *backend) operationRoleDelete(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roleName := data.Get("role").(string)
-	return nil, b.roleMgr.Delete(ctx, req.Storage, roleName)
+	if err := req.Storage.Delete(ctx, "role/"+data.Get("role").(string)); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func (b *backend) operationRoleList(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	roles, err := b.roleMgr.List(ctx, req.Storage)
+	roleNames, err := req.Storage.List(ctx, "role/")
 	if err != nil {
 		return nil, err
 	}
-	return logical.ListResponse(roles), nil
+	return logical.ListResponse(roleNames), nil
+}
+
+func readRole(ctx context.Context, s logical.Storage, roleName string) (*roleEntry, error) {
+	role, err := s.Get(ctx, "role/"+roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return nil, nil
+	}
+	result := &roleEntry{}
+	if err := role.DecodeJSON(result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 const pathRoleSyn = `
