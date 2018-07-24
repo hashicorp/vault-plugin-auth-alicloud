@@ -17,7 +17,7 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, erro
 	}
 	role := m["role"]
 
-	loginData, err := tools.GenerateLoginData(m["access_key_id"], m["access_key_secret"], m["security_token"], m["region"])
+	loginData, err := tools.GenerateLoginData(m["access_key"], m["secret_key"], m["security_token"], m["region"])
 	if err != nil {
 		return nil, err
 	}
@@ -48,10 +48,10 @@ Usage: vault login -method=alibaba [CONFIG K=V...]
 
 Configuration:
 
-  access_key_id=<string>
+  access_key=<string>
       Explicit Alibaba access key ID
 
-  access_key_secret=<string>
+  secret_key=<string>
       Explicit Alibaba secret access key
 
   security_token=<string>
