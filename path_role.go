@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/helper/parseutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -110,7 +111,7 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 	if raw, ok := data.GetOk("arn"); ok {
 		arn, err := parseARN(raw.(string))
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
+			return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse arn %s: {{err}}", arn), err)
 		}
 		if arn.Type != arnTypeRole {
 			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", role.ARN)
@@ -140,7 +141,7 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 	role.BoundCIDRs = boundCIDRs
 
 	if role.MaxTTL > 0 && role.TTL > role.MaxTTL {
-		return nil, fmt.Errorf("ttl exceeds max_ttl")
+		return nil, errors.New("ttl exceeds max_ttl")
 	}
 
 	entry, err := logical.StorageEntryJSON("role/"+roleName, role)
