@@ -21,6 +21,12 @@ func pathLogin(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "login$",
 		Fields: map[string]*framework.FieldSchema{
+			"role": {
+				Type: framework.TypeString,
+				Description: `Name of the role against which the login is being attempted.
+If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by 
+the GetCallerIdentity request. If a matching role is not found, login fails.`,
+			},
 			"identity_request_url": {
 				Type:        framework.TypeString,
 				Description: "Base64-encoded full URL against which to make the Alibaba request.",
@@ -78,7 +84,17 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
-	role, err := readRole(ctx, req.Storage, parsedARN.RoleName)
+	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
+	// in the ARN returned by the GetCallerIdentity call.
+	roleName := ""
+	roleNameIfc, ok := data.GetOk("role")
+	if ok {
+		roleName = roleNameIfc.(string)
+	} else {
+		roleName = parsedARN.RoleName
+	}
+
+	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}

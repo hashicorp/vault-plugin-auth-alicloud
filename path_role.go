@@ -112,10 +112,6 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse arn %s: %s", arn, err)
 		}
-		if roleName != arn.RoleName {
-			// All roles must bear the same name as the ramRole to facilitate looking them up at login time.
-			return nil, fmt.Errorf("role name must match arn name of %s", arn.RoleName)
-		}
 		if arn.Type != arnTypeRole {
 			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", role.ARN)
 		}
