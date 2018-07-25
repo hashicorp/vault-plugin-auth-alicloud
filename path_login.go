@@ -48,15 +48,15 @@ This must include the headers over which Alibaba has included a signature.`,
 
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 
-	b64Url := data.Get("identity_request_url").(string)
-	if b64Url == "" {
+	b64URL := data.Get("identity_request_url").(string)
+	if b64URL == "" {
 		return nil, errors.New("missing identity_request_url")
 	}
-	identityReqUrl, err := base64.StdEncoding.DecodeString(b64Url)
+	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
 		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
 	}
-	if _, err := url.Parse(string(identityReqUrl)); err != nil {
+	if _, err := url.Parse(string(identityReqURL)); err != nil {
 		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
 	}
 
@@ -72,7 +72,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, errors.New("nil response when parsing identity_request_headers")
 	}
 
-	callerIdentity, err := b.getCallerIdentity(headers, string(identityReqUrl))
+	callerIdentity, err := b.getCallerIdentity(headers, string(identityReqURL))
 	if err != nil {
 		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
 	}
