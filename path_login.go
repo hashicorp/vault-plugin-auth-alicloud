@@ -12,6 +12,7 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/helper/cidrutil"
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -53,10 +54,10 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	}
 	identityReqUrl, err := base64.StdEncoding.DecodeString(b64Url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %s", err)
+		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
 	}
 	if _, err := url.Parse(string(identityReqUrl)); err != nil {
-		return nil, fmt.Errorf("error parsing identity_request_url: %s", err)
+		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
 	}
 
 	b64Header := data.Get("identity_request_headers").(string)
@@ -65,7 +66,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	}
 	headers, err := parseHeaders(b64Header)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing identity_request_headers: %v", err)
+		return nil, errwrap.Wrapf("error parsing identity_request_headers: {{err}}", err)
 	}
 	if headers == nil {
 		return nil, errors.New("nil response when parsing identity_request_headers")
@@ -73,12 +74,12 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 
 	callerIdentity, err := b.getCallerIdentity(headers, string(identityReqUrl))
 	if err != nil {
-		return nil, fmt.Errorf("error making upstream request: %v", err)
+		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
 	}
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse entity's arn %s due to %s", callerIdentity.Arn, err)
+		return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
@@ -213,21 +214,21 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 
 	response, err := b.identityClient.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %s", err)
+		return nil, errwrap.Wrapf("error making request: {{err}}", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
 		b, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			return nil, fmt.Errorf("error reading response body: %s", err)
+			return nil, errwrap.Wrapf("error reading response body: {{err}}", err)
 		}
 		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
 	}
 
 	result := &sts.GetCallerIdentityResponse{}
 	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
-		return nil, fmt.Errorf("error decoding response: %s", err)
+		return nil, errwrap.Wrapf("error decoding response: {{err}}", err)
 	}
 	return result, nil
 }
@@ -252,11 +253,11 @@ func getSTSEndpoint() (string, error) {
 func parseHeaders(b64Header string) (http.Header, error) {
 	b, err := base64.StdEncoding.DecodeString(b64Header)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode identity_request_headers")
+		return nil, errwrap.Wrapf("failed to base64 decode identity_request_headers: {{err}}", err)
 	}
 	var headers http.Header
 	if err := json.Unmarshal(b, &headers); err != nil {
-		return nil, fmt.Errorf("failed to JSON decode identity_request_headers %s: %s", b, err)
+		return nil, errwrap.Wrapf(fmt.Sprintf("failed to JSON decode identity_request_headers %s: {{err}}", b), err)
 	}
 	return headers, nil
 }
