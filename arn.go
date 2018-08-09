@@ -20,7 +20,7 @@ func parseARN(a string) (*arn, error) {
 		return nil, fmt.Errorf("unrecognized arn: contains %d colon-separated fields, expected 5", len(outerFields))
 	}
 	if outerFields[0] != "acs" {
-		return nil, errors.New("unrecognized arn: does not begin with \"acs:\"")
+		return nil, errors.New(`unrecognized arn: does not begin with "acs:"`)
 	}
 	if outerFields[1] != "ram" {
 		return nil, fmt.Errorf("unrecognized service: %v, not ram", outerFields[1])

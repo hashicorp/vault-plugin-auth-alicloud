@@ -123,9 +123,6 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 				"request_id":    callerIdentity.RequestId,
 				"role_name":     parsedARN.RoleName,
 			},
-			InternalData: map[string]interface{}{
-				"role_name": parsedARN.RoleName,
-			},
 			DisplayName: callerIdentity.PrincipalId,
 			LeaseOptions: logical.LeaseOptions{
 				Renewable: true,
@@ -151,12 +148,8 @@ func (b *backend) pathLoginRenew(ctx context.Context, req *logical.Request, data
 		return nil, err
 	}
 
-	roleName := ""
-	roleNameIfc, ok := req.Auth.InternalData["role_name"]
-	if ok {
-		roleName = roleNameIfc.(string)
-	}
-	if roleName == "" {
+	roleName, ok := req.Auth.Metadata["role_name"]
+	if !ok {
 		return nil, errors.New("error retrieving role_name during renewal")
 	}
 

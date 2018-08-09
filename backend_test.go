@@ -263,9 +263,6 @@ func LoginSuccess(t *testing.T) {
 	if resp.Auth.Metadata["role_name"] != "elk" {
 		t.Fatalf("expected elk but received %s", resp.Auth.Metadata["role_name"])
 	}
-	if resp.Auth.InternalData["role_name"] != "elk" {
-		t.Fatalf("expected elk but received %s", resp.Auth.InternalData["role_name"])
-	}
 	if resp.Auth.DisplayName != "vm-ram-i-rj978rorvlg76urhqh7q" {
 		t.Fatalf("expected vm-ram-i-rj978rorvlg76urhqh7q but received %s", resp.Auth.DisplayName)
 	}
