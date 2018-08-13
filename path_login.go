@@ -33,9 +33,9 @@ the GetCallerIdentity request. If a matching role is not found, login fails.`,
 				Description: "Base64-encoded full URL against which to make the Alibaba request.",
 			},
 			"identity_request_headers": {
-				Type: framework.TypeString,
-				Description: `Base64-encoded JSON representation of the request headers. 
-This must include the headers over which Alibaba has included a signature.`,
+				Type: framework.TypeHeader,
+				Description: `The request headers. This must include the headers over which Alibaba
+has included a signature.`,
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
@@ -60,19 +60,12 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
 	}
 
-	b64Header := data.Get("identity_request_headers").(string)
-	if b64Header == "" {
+	header := data.Get("identity_request_headers").(http.Header)
+	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
 	}
-	headers, err := parseHeaders(b64Header)
-	if err != nil {
-		return nil, errwrap.Wrapf("error parsing identity_request_headers: {{err}}", err)
-	}
-	if headers == nil {
-		return nil, errors.New("nil response when parsing identity_request_headers")
-	}
 
-	callerIdentity, err := b.getCallerIdentity(headers, string(identityReqURL))
+	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
 	if err != nil {
 		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
 	}
@@ -241,18 +234,6 @@ func getSTSEndpoint() (string, error) {
 		return "", fmt.Errorf("got an unexpected endpoint: %s", endpoint)
 	}
 	return endpoint, nil
-}
-
-func parseHeaders(b64Header string) (http.Header, error) {
-	b, err := base64.StdEncoding.DecodeString(b64Header)
-	if err != nil {
-		return nil, errwrap.Wrapf("failed to base64 decode identity_request_headers: {{err}}", err)
-	}
-	var headers http.Header
-	if err := json.Unmarshal(b, &headers); err != nil {
-		return nil, errwrap.Wrapf(fmt.Sprintf("failed to JSON decode identity_request_headers %s: {{err}}", b), err)
-	}
-	return headers, nil
 }
 
 const pathLoginSyn = `
