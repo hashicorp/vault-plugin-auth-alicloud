@@ -38,8 +38,8 @@
   name = "github.com/hashicorp/go-sockaddr"
 
 [[constraint]]
+  branch = "master"
   name = "github.com/hashicorp/vault"
-  version = "0.10.3"
 
 [prune]
   go-tests = true
