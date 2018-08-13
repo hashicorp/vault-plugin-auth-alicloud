@@ -172,7 +172,8 @@
   revision = "f40e974e75af4e271d97ce0fc917af5898ae7bda"
 
 [[projects]]
-  digest = "1:0f71e8e3766e4a9ebcb8878abaa4b5599f809225b4ec52c82d50296ec43c054f"
+  branch = "master"
+  digest = "1:3d008f995b8f2e49668ac7d41bb3d4caf6146d55319147757a1e59751a0cd932"
   name = "github.com/hashicorp/vault"
   packages = [
     "api",
@@ -201,8 +202,7 @@
     "version",
   ]
   pruneopts = "UT"
-  revision = "533003e27840d9646cb4e7d23b3a113895da1dd0"
-  version = "v0.10.3"
+  revision = "13a2bb152e228bea04c88bdeefa3f289c208fcf2"
 
 [[projects]]
   branch = "master"
@@ -393,6 +393,7 @@
     "github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials",
     "github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints",
     "github.com/aliyun/alibaba-cloud-sdk-go/services/sts",
+    "github.com/hashicorp/errwrap",
     "github.com/hashicorp/go-cleanhttp",
     "github.com/hashicorp/go-hclog",
     "github.com/hashicorp/go-sockaddr",
