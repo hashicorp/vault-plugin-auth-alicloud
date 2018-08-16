@@ -230,8 +230,8 @@ func getSTSEndpoint() (string, error) {
 	if !supported {
 		return "", errors.New("sts endpoint is no longer supported")
 	}
-	if endpoint != "sts.aliyuncs.com" {
-		return "", fmt.Errorf("got an unexpected endpoint: %s", endpoint)
+	if endpoint == "" {
+		return "", errors.New("got an empty endpoint")
 	}
 	return endpoint, nil
 }
