@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
-	"github.com/hashicorp/vault-plugin-auth-alibaba/tools"
+	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/logical"
 )
 

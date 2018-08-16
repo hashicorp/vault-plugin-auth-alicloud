@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/vault-plugin-auth-alibaba/tools"
+	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/api"
 )
 
@@ -14,7 +14,7 @@ type CLIHandler struct{}
 func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, error) {
 	mount, ok := m["mount"]
 	if !ok {
-		mount = "alibaba"
+		mount = "alicloud"
 	}
 	role := m["role"]
 
@@ -38,34 +38,34 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, erro
 
 func (h *CLIHandler) Help() string {
 	help := `
-Usage: vault login -method=alibaba [CONFIG K=V...]
+Usage: vault login -method=alicloud [CONFIG K=V...]
 
-  The Alibaba auth method allows users to authenticate with Alibaba RAM
+  The AliCloud auth method allows users to authenticate with AliCloud RAM
   credentials.
 
-  The Alibaba RAM credentials may be specified explicitly via the command line:
+  The AliCloud RAM credentials may be specified explicitly via the command line:
 
-      $ vault login -method=alibaba access_key_id=... access_key_secret=... security_token=... region=...
+      $ vault login -method=alicloud access_key=... secret_key=... security_token=... region=...
 
 Configuration:
 
   access_key=<string>
-      Explicit Alibaba access key ID
+      Explicit AliCloud access key ID
 
   secret_key=<string>
-      Explicit Alibaba secret access key
+      Explicit AliCloud secret access key
 
   security_token=<string>
-      Explicit Alibaba security token
+      Explicit AliCloud security token
 
   region=<string>
-	  Explicit Alibaba region
+	  Explicit AliCloud region
 
   mount=<string>
-      Path where the Alibaba credential method is mounted. This is usually provided
+      Path where the AliCloud credential method is mounted. This is usually provided
       via the -path flag in the "vault login" command, but it can be specified
       here as well. If specified here, it takes precedence over the value for
-      -path. The default value is "alibaba".
+      -path. The default value is "alicloud".
 
   role=<string>
       Name of the role to request a token against

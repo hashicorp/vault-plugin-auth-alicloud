@@ -52,6 +52,6 @@ type backend struct {
 }
 
 const backendHelp = `
-That Alibaba RAM auth method allows entities to authenticate based on their
+That AliCloud RAM auth method allows entities to authenticate based on their
 identity and pre-configured roles.
 `

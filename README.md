@@ -1,4 +1,4 @@
-# Vault Plugin: Alibaba Auth Backend
+# Vault Plugin: AliCloud Auth Backend
 
 This is a standalone backend plugin for use with [Hashicorp Vault](https://www.github.com/hashicorp/vault).
 This plugin allows authentication to Vault using Resource Access Management (RAM).
@@ -7,7 +7,7 @@ This plugin allows authentication to Vault using Resource Access Management (RAM
 
 ## Quick Links
     - Vault Website: https://www.vaultproject.io
-    - Alibaba Auth Docs: https://www.vaultproject.io/docs/auth/alibaba.html
+    - AliCloud Auth Docs: https://www.vaultproject.io/docs/auth/alicloud.html
     - Main Project Github: https://www.github.com/hashicorp/vault
 
 ## Getting Started
@@ -22,22 +22,22 @@ To learn specifically about how plugins work, see documentation on [Vault plugin
 
 ## Security Model
 
-This authentication model places Vault in the middle of a call between a client and Alibaba's "GetCallerIdentity" method. Based on Alibaba's response, it grants an access token based on pre-configured roles.
+This authentication model places Vault in the middle of a call between a client and AliCloud's "GetCallerIdentity" method. Based on AliCloud's response, it grants an access token based on pre-configured roles.
 
 ## Usage
 
-Please see [documentation for the plugin](https://www.vaultproject.io/docs/auth/alibaba.html)
+Please see [documentation for the plugin](https://www.vaultproject.io/docs/auth/alicloud.html)
 on the Vault website.
 
 This plugin is currently built into Vault and by default is accessed
-at `auth/alibaba`. To enable this in a running Vault server:
+at `auth/alicloud`. To enable this in a running Vault server:
 
 ```sh
-$ vault auth enable alibaba
-Successfully enabled 'alibaba' at 'alibaba'!
+$ vault auth enable alicloud
+Successfully enabled 'alicloud' at 'alicloud'!
 ```
 
-To see all the supported paths, see the [Alibaba auth backend docs](https://www.vaultproject.io/docs/auth/alibaba.html).
+To see all the supported paths, see the [AliCloud auth backend docs](https://www.vaultproject.io/docs/auth/alicloud.html).
 
 ## Developing
 
@@ -47,7 +47,7 @@ If you wish to work on this plugin, you'll first need
 For local dev first make sure Go is properly installed, including
 setting up a [GOPATH](https://golang.org/doc/code.html#GOPATH).
 Next, clone this repository into
-`$GOPATH/src/github.com/hashicorp/vault-plugin-auth-alibaba`.
+`$GOPATH/src/github.com/hashicorp/vault-plugin-auth-alicloud`.
 You can then download any required build tools by bootstrapping your
 environment:
 
@@ -83,29 +83,29 @@ $ vault server -config=path/to/config.json ...
 Once the server is started, register the plugin in the Vault server's [plugin catalog](https://www.vaultproject.io/docs/internals/plugins.html#plugin-catalog):
 
 ```sh
-$ vault write sys/plugins/catalog/alibaba \
+$ vault write sys/plugins/catalog/alicloud \
         sha_256=<expected SHA256 Hex value of the plugin binary> \
-        command="vault-plugin-auth-alibaba"
+        command="vault-plugin-auth-alicloud"
 ...
-Success! Data written to: sys/plugins/catalog/alibaba
+Success! Data written to: sys/plugins/catalog/alicloud
 ```
 
 Note you should generate a new sha256 checksum if you have made changes
 to the plugin. Example using openssl:
 
 ```sh
-openssl dgst -sha256 $GOPATH/vault-plugin-auth-alibaba
+openssl dgst -sha256 $GOPATH/vault-plugin-auth-alicloud
 ...
-SHA256(.../go/bin/vault-plugin-auth-alibaba)= 896c13c0f5305daed381952a128322e02bc28a57d0c862a78cbc2ea66e8c6fa1
+SHA256(.../go/bin/vault-plugin-auth-alicloud)= 896c13c0f5305daed381952a128322e02bc28a57d0c862a78cbc2ea66e8c6fa1
 ```
 
-Enable the auth plugin backend using the Alibaba auth plugin:
+Enable the auth plugin backend using the AliCloud auth plugin:
 
 ```sh
-$ vault auth enable -plugin-name='alibaba' plugin
+$ vault auth enable -plugin-name='alicloud' plugin
 ...
 
-Successfully enabled 'plugin' at 'alibaba'!
+Successfully enabled 'plugin' at 'alicloud'!
 ```
 
 #### Tests

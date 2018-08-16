@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-TOOL=vault-plugin-auth-alibaba
+TOOL=vault-plugin-auth-alicloud
 #
 # This script builds the application from source for multiple platforms.
 set -e
