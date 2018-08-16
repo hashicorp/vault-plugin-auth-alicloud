@@ -14,7 +14,7 @@ to build the credentials for your request; however, it is possible
 to provide credentials through other means. If that's the case for
 your instance, consider editing the code below to match the
 type of credentials you're using. It also assumes you've mounted
-alibaba at a path of "alibaba". If not, adjust that code as well.
+alicloud at a path of "alicloud". If not, adjust that code as well.
 
 Also, CaptureOutboundIdentityRequest and ConstructVaultLoginRequest
 are exported to facilitate easy use by Go developers who want to hit
@@ -30,7 +30,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/hashicorp/vault-plugin-auth-alibaba/tools"
+	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 )
 
 func main() {
@@ -74,7 +74,7 @@ func main() {
 		panic(err)
 	}
 
-	loginReq, err := http.NewRequest(http.MethodPost, vaultAddr+"/v1/auth/alibaba/login", bytes.NewReader(b))
+	loginReq, err := http.NewRequest(http.MethodPost, vaultAddr+"/v1/auth/alicloud/login", bytes.NewReader(b))
 	if err != nil {
 		panic(err)
 	}

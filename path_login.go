@@ -30,11 +30,11 @@ the GetCallerIdentity request. If a matching role is not found, login fails.`,
 			},
 			"identity_request_url": {
 				Type:        framework.TypeString,
-				Description: "Base64-encoded full URL against which to make the Alibaba request.",
+				Description: "Base64-encoded full URL against which to make the AliCloud request.",
 			},
 			"identity_request_headers": {
 				Type: framework.TypeHeader,
-				Description: `The request headers. This must include the headers over which Alibaba
+				Description: `The request headers. This must include the headers over which AliCloud
 has included a signature.`,
 			},
 		},
@@ -241,7 +241,7 @@ Authenticates an RAM entity with Vault.
 `
 
 const pathLoginDesc = `
-Authenticate Alibaba entities using an arbitrary RAM principal.
+Authenticate AliCloud entities using an arbitrary RAM principal.
 
 RAM principals are authenticated by processing a signed sts:GetCallerIdentity
 request and then parsing the response to see who signed the request.
