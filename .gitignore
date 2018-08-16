@@ -10,7 +10,12 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# JetBrains config files
 .idea*
+
+# The login binary that may be generated in the tools directory.
+tools/login/login
 
 pkg*
 bin*
