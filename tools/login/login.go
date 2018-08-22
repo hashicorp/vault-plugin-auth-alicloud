@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
 	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 )
 
@@ -49,22 +50,18 @@ func main() {
 		panic("VAULT_ADDR must be set")
 	}
 
-	metadataResp, err := http.DefaultClient.Get("http://100.100.100.200/latest/meta-data/ram/security-credentials/" + roleName)
+	// Credentials can be provided either explicitly via env vars,
+	// or we will try to derive them from instance metadata.
+	credentialChain := []providers.Provider{
+		providers.NewEnvCredentialProvider(),
+		providers.NewInstanceMetadataProvider(),
+	}
+	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
 	if err != nil {
 		panic(err)
 	}
-	defer metadataResp.Body.Close()
 
-	metadata := make(map[string]interface{})
-	if err := json.NewDecoder(metadataResp.Body).Decode(&metadata); err != nil {
-		panic(err)
-	}
-
-	accessKey := metadata["AccessKeyId"].(string)
-	accessKeySecret := metadata["AccessKeySecret"].(string)
-	securityToken := metadata["SecurityToken"].(string)
-
-	loginData, err := tools.GenerateLoginData(accessKey, accessKeySecret, securityToken, region)
+	loginData, err := tools.GenerateLoginData(creds, region)
 	if err != nil {
 		panic(err)
 	}

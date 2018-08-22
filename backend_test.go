@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/logical"
@@ -207,7 +208,16 @@ func ListOfOne(t *testing.T) {
 }
 
 func LoginSuccess(t *testing.T) {
-	data, err := tools.GenerateLoginData("accessKeyID", "accessKeySecret", "securityToken", "us-west-2")
+	creds, err := providers.NewConfigurationCredentialProvider(&providers.Configuration{
+		AccessKeyID:       "accessKeyID",
+		AccessKeySecret:   "accessKeySecret",
+		AccessKeyStsToken: "securityToken",
+	}).Retrieve()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := tools.GenerateLoginData(creds, "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}
