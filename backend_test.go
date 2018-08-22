@@ -217,7 +217,7 @@ func LoginSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := tools.GenerateLoginData(creds, "us-west-2")
+	data, err := tools.GenerateLoginData("elk", creds, "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}

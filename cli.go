@@ -33,12 +33,11 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, erro
 		return nil, err
 	}
 
-	loginData, err := tools.GenerateLoginData(creds, m["region"])
+	loginData, err := tools.GenerateLoginData(role, creds, m["region"])
 	if err != nil {
 		return nil, err
 	}
 
-	loginData["role"] = role
 	path := fmt.Sprintf("auth/%s/login", mount)
 
 	secret, err := c.Logical().Write(path, loginData)

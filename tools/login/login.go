@@ -61,7 +61,7 @@ func main() {
 		panic(err)
 	}
 
-	loginData, err := tools.GenerateLoginData(creds, region)
+	loginData, err := tools.GenerateLoginData(roleName, creds, region)
 	if err != nil {
 		panic(err)
 	}
