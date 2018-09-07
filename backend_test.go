@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -15,58 +16,138 @@ import (
 	"github.com/hashicorp/vault/logical"
 )
 
-var (
-	testCtx     = context.Background()
-	testStorage = &logical.InmemStorage{}
-	testBackend = func() logical.Backend {
-		client := cleanhttp.DefaultClient()
-		client.Transport = &fauxRoundTripper{}
-		b := newBackend(client)
-		conf := &logical.BackendConfig{
-			System: &logical.StaticSystemView{
-				DefaultLeaseTTLVal: time.Hour,
-				MaxLeaseTTLVal:     time.Hour,
-			},
-		}
-		if err := b.Setup(testCtx, conf); err != nil {
-			panic(err)
-		}
-		return b
-	}()
+const (
+	envVarRunAccTests = "VAULT_ACC"
+
+	envVarAccTestRoleARN   = "VAULT_ACC_TEST_ROLE_ARN"
+	envVarAccTestAccessKey = "VAULT_ACC_TEST_ACCESS_KEY"
+	envVarAccTestSecretKey = "VAULT_ACC_TEST_SECRET_KEY"
 )
 
-func TestBackend(t *testing.T) {
-	// Exercise all the role endpoints.
-	t.Run("EmptyList", EmptyList)
-	t.Run("CreateRole", CreateRole)
-	t.Run("ReadRole", ReadRole)
-	t.Run("ListOfOne", ListOfOne)
-	t.Run("UpdateRole", UpdateRole)
-	t.Run("ReadUpdatedRole", ReadUpdatedRole)
-	t.Run("ListOfOne", ListOfOne)
-	t.Run("DeleteRole", DeleteRole)
-	t.Run("EmptyList", EmptyList)
+var runAcceptanceTests = os.Getenv(envVarRunAccTests) == "1"
 
-	// Create the role again so we can test logging in.
-	t.Run("CreateRole", CreateRole)
-	t.Run("LoginSuccess", LoginSuccess)
+type testEnv struct {
+	ctx     context.Context
+	storage logical.Storage
+	backend logical.Backend
+
+	arn       *arn
+	accessKey string
+	secretKey string
 }
 
-func CreateRole(t *testing.T) {
+// This test doesn't make real API calls. It injects a fauxRoundTripper
+// that intercepts outbound http calls and provides a mocked response.
+func TestBackend_Integration(t *testing.T) {
+	ctx := context.Background()
+	arn, err := parseARN("acs:ram::5138828231865461:role/elk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := testEnv{
+		ctx:     ctx,
+		storage: &logical.InmemStorage{},
+		backend: func() logical.Backend {
+			client := cleanhttp.DefaultClient()
+			client.Transport = &fauxRoundTripper{}
+			b := newBackend(client)
+			conf := &logical.BackendConfig{
+				System: &logical.StaticSystemView{
+					DefaultLeaseTTLVal: time.Hour,
+					MaxLeaseTTLVal:     time.Hour,
+				},
+			}
+			if err := b.Setup(ctx, conf); err != nil {
+				panic(err)
+			}
+			return b
+		}(),
+		arn:       arn,
+		accessKey: "somekey",
+		secretKey: "somesecret",
+	}
+
+	// Exercise all the role endpoints.
+	t.Run("EmptyList", e.EmptyList)
+	t.Run("CreateRole", e.CreateRole)
+	t.Run("ReadRole", e.ReadRole)
+	t.Run("ListOfOne", e.ListOfOne)
+	t.Run("UpdateRole", e.UpdateRole)
+	t.Run("ReadUpdatedRole", e.ReadUpdatedRole)
+	t.Run("ListOfOne", e.ListOfOne)
+	t.Run("DeleteRole", e.DeleteRole)
+	t.Run("EmptyList", e.EmptyList)
+
+	// Create the role again so we can test logging in.
+	t.Run("CreateRole", e.CreateRole)
+	t.Run("LoginSuccess", e.LoginSuccess)
+}
+
+// This test makes real API calls. It's intended for developers and a CI
+// test runner.
+func TestBackend_Acceptance(t *testing.T) {
+	if !runAcceptanceTests {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	arn, err := parseARN(os.Getenv(envVarAccTestRoleARN))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := testEnv{
+		ctx:     ctx,
+		storage: &logical.InmemStorage{},
+		backend: func() logical.Backend {
+			client := cleanhttp.DefaultClient()
+			b := newBackend(client)
+			conf := &logical.BackendConfig{
+				System: &logical.StaticSystemView{
+					DefaultLeaseTTLVal: time.Hour,
+					MaxLeaseTTLVal:     time.Hour,
+				},
+			}
+			if err := b.Setup(ctx, conf); err != nil {
+				panic(err)
+			}
+			return b
+		}(),
+		arn:       arn,
+		accessKey: os.Getenv(envVarAccTestAccessKey),
+		secretKey: os.Getenv(envVarAccTestSecretKey),
+	}
+
+	// Exercise all the role endpoints.
+	t.Run("EmptyList", e.EmptyList)
+	t.Run("CreateRole", e.CreateRole)
+	t.Run("ReadRole", e.ReadRole)
+	t.Run("ListOfOne", e.ListOfOne)
+	t.Run("UpdateRole", e.UpdateRole)
+	t.Run("ReadUpdatedRole", e.ReadUpdatedRole)
+	t.Run("ListOfOne", e.ListOfOne)
+	t.Run("DeleteRole", e.DeleteRole)
+	t.Run("EmptyList", e.EmptyList)
+
+	// Create the role again so we can test logging in.
+	t.Run("CreateRole", e.CreateRole)
+	t.Run("LoginSuccess", e.LoginSuccess)
+}
+
+func (e *testEnv) CreateRole(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.CreateOperation,
-		Path:      "role/elk",
-		Storage:   testStorage,
+		Path:      "role/" + e.arn.RoleName,
+		Storage:   e.storage,
 		Data: map[string]interface{}{
-			"arn":         "acs:ram::5138828231865461:role/elk",
-			"policies":    "logstash",
+			"arn":         e.arn.String(),
+			"policies":    "default",
 			"ttl":         10,
 			"max_ttl":     10,
 			"period":      1,
 			"bound_cidrs": []string{"127.0.0.1/24"},
 		},
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,24 +156,24 @@ func CreateRole(t *testing.T) {
 	}
 }
 
-func ReadRole(t *testing.T) {
+func (e *testEnv) ReadRole(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
-		Path:      "role/elk",
-		Storage:   testStorage,
+		Path:      "role/" + e.arn.RoleName,
+		Storage:   e.storage,
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp == nil {
 		t.Fatal("expected response containing data")
 	}
-	if resp.Data["arn"] != "acs:ram::5138828231865461:role/elk" {
-		t.Fatalf("expected arn of acs:ram::5138828231865461:role/elk but received %s", resp.Data["arn"])
+	if resp.Data["arn"] != e.arn.String() {
+		t.Fatalf("expected arn of %s but received %s", e.arn, resp.Data["arn"])
 	}
-	if resp.Data["policies"].([]string)[0] != "logstash" {
-		t.Fatalf("expected policy of logstash but received %s", resp.Data["policies"].([]string)[0])
+	if resp.Data["policies"].([]string)[0] != "default" {
+		t.Fatalf("expected policy of default but received %s", resp.Data["policies"].([]string)[0])
 	}
 	if resp.Data["ttl"].(time.Duration) != 10 {
 		t.Fatalf("expected ttl of 10 but received %d", resp.Data["ttl"].(time.Duration))
@@ -105,16 +186,16 @@ func ReadRole(t *testing.T) {
 	}
 }
 
-func UpdateRole(t *testing.T) {
+func (e *testEnv) UpdateRole(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
-		Path:      "role/elk",
-		Storage:   testStorage,
+		Path:      "role/" + e.arn.RoleName,
+		Storage:   e.storage,
 		Data: map[string]interface{}{
 			"max_ttl": 100,
 		},
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,24 +204,24 @@ func UpdateRole(t *testing.T) {
 	}
 }
 
-func ReadUpdatedRole(t *testing.T) {
+func (e *testEnv) ReadUpdatedRole(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
-		Path:      "role/elk",
-		Storage:   testStorage,
+		Path:      "role/" + e.arn.RoleName,
+		Storage:   e.storage,
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if resp == nil {
 		t.Fatalf("expected response containing data")
 	}
-	if resp.Data["arn"] != "acs:ram::5138828231865461:role/elk" {
-		t.Fatalf("expected arn of acs:ram::5138828231865461:role/elk but received %s", resp.Data["arn"])
+	if resp.Data["arn"] != e.arn.String() {
+		t.Fatalf("expected arn of %s but received %s", e.arn, resp.Data["arn"])
 	}
-	if resp.Data["policies"].([]string)[0] != "logstash" {
-		t.Fatalf("expected policy of logstash but received %s", resp.Data["policies"].([]string)[0])
+	if resp.Data["policies"].([]string)[0] != "default" {
+		t.Fatalf("expected policy of default but received %s", resp.Data["policies"].([]string)[0])
 	}
 	if resp.Data["ttl"].(time.Duration) != 10 {
 		t.Fatalf("expected ttl of 10 but received %d", resp.Data["ttl"].(time.Duration))
@@ -153,13 +234,13 @@ func ReadUpdatedRole(t *testing.T) {
 	}
 }
 
-func DeleteRole(t *testing.T) {
+func (e *testEnv) DeleteRole(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.DeleteOperation,
-		Path:      "role/elk",
-		Storage:   testStorage,
+		Path:      "role/" + e.arn.RoleName,
+		Storage:   e.storage,
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,13 +249,13 @@ func DeleteRole(t *testing.T) {
 	}
 }
 
-func EmptyList(t *testing.T) {
+func (e *testEnv) EmptyList(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ListOperation,
 		Path:      "role/",
-		Storage:   testStorage,
+		Storage:   e.storage,
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,13 +267,13 @@ func EmptyList(t *testing.T) {
 	}
 }
 
-func ListOfOne(t *testing.T) {
+func (e *testEnv) ListOfOne(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ListOperation,
 		Path:      "role/",
-		Storage:   testStorage,
+		Storage:   e.storage,
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,34 +284,33 @@ func ListOfOne(t *testing.T) {
 		t.Fatal("1 key should have been returned")
 	}
 	if resp.Data["keys"].([]string)[0] != "elk" {
-		t.Fatalf("expected elk but received %s", resp.Data["keys"].([]string)[0])
+		t.Fatalf("expected %s but received %s", e.arn.RoleName, resp.Data["keys"].([]string)[0])
 	}
 }
 
-func LoginSuccess(t *testing.T) {
+func (e *testEnv) LoginSuccess(t *testing.T) {
 	creds, err := providers.NewConfigurationCredentialProvider(&providers.Configuration{
-		AccessKeyID:       "accessKeyID",
-		AccessKeySecret:   "accessKeySecret",
-		AccessKeyStsToken: "securityToken",
+		AccessKeyID:     e.accessKey,
+		AccessKeySecret: e.secretKey,
 	}).Retrieve()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	data, err := tools.GenerateLoginData("elk", creds, "us-west-2")
+	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      "login",
-		Storage:   testStorage,
+		Storage:   e.storage,
 		Data:      data,
 		Connection: &logical.Connection{
 			RemoteAddr: "127.0.0.1/24",
 		},
 	}
-	resp, err := testBackend.HandleRequest(testCtx, req)
+	resp, err := e.backend.HandleRequest(e.ctx, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,35 +326,37 @@ func LoginSuccess(t *testing.T) {
 	if len(resp.Auth.Policies) != 1 {
 		t.Fatalf("expected 1 policy but received %d", len(resp.Auth.Policies))
 	}
-	if resp.Auth.Policies[0] != "logstash" {
-		t.Fatalf("expected logstash but received %s", resp.Auth.Policies[0])
+	if resp.Auth.Policies[0] != "default" {
+		t.Fatalf("expected default but received %s", resp.Auth.Policies[0])
 	}
-	if resp.Auth.Metadata["account_id"] != "5138828231865461" {
-		t.Fatalf("expected 5138828231865461 but received %s", resp.Auth.Metadata["account_id"])
+	if resp.Auth.Metadata["account_id"] != e.arn.AccountNumber {
+		t.Fatalf("expected %s but received %s", e.arn.AccountNumber, resp.Auth.Metadata["account_id"])
 	}
-	if resp.Auth.Metadata["user_id"] != "216959339000654321" {
-		t.Fatalf("expected 216959339000654321 but received %s", resp.Auth.Metadata["user_id"])
+	if resp.Auth.Metadata["user_id"] == "" {
+		t.Fatal("expected user_id but received none")
 	}
-	if resp.Auth.Metadata["role_id"] != "1234" {
-		t.Fatalf("expected 1234 but received %s", resp.Auth.Metadata["role_id"])
+	if resp.Auth.Metadata["role_id"] == "" {
+		t.Fatal("expected role_id but received none")
 	}
-	if resp.Auth.Metadata["arn"] != "acs:ram::5138828231865461:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q" {
-		t.Fatalf("expected acs:ram::5138828231865461:assumed-role/elk/vm-ram-i-rj978rorvlg76urhqh7q but received %s", resp.Auth.Metadata["arn"])
+	assumedRoleArn, err := parseARN(resp.Auth.Metadata["arn"])
+	if err != nil {
+		t.Fatal(err)
 	}
-	if resp.Auth.Metadata["identity_type"] != "assumed-role" {
-		t.Fatalf("expected assumed-role but received %s", resp.Auth.Metadata["identity_type"])
+	if !assumedRoleArn.IsMemberOf(e.arn) {
+		t.Fatalf("assumed role arn of %s is not a member of role arn of %s", assumedRoleArn, e.arn)
 	}
-	if resp.Auth.Metadata["principal_id"] != "vm-ram-i-rj978rorvlg76urhqh7q" {
-		t.Fatalf("expected vm-ram-i-rj978rorvlg76urhqh7q but received %s", resp.Auth.Metadata["principal_id"])
+
+	if resp.Auth.Metadata["principal_id"] == "" {
+		t.Fatal("expected principal_id but received none")
 	}
-	if resp.Auth.Metadata["request_id"] != "2C9BE469-4A35-44D5-9529-CAA280B11603" {
-		t.Fatalf("expected 2C9BE469-4A35-44D5-9529-CAA280B11603 but received %s", resp.Auth.Metadata["request_id"])
+	if resp.Auth.Metadata["request_id"] == "" {
+		t.Fatalf("expected request_id but received none")
 	}
-	if resp.Auth.Metadata["role_name"] != "elk" {
-		t.Fatalf("expected elk but received %s", resp.Auth.Metadata["role_name"])
+	if resp.Auth.Metadata["role_name"] != e.arn.RoleName {
+		t.Fatalf("expected %s but received %s", e.arn.RoleName, resp.Auth.Metadata["role_name"])
 	}
-	if resp.Auth.DisplayName != "vm-ram-i-rj978rorvlg76urhqh7q" {
-		t.Fatalf("expected vm-ram-i-rj978rorvlg76urhqh7q but received %s", resp.Auth.DisplayName)
+	if resp.Auth.DisplayName == "" {
+		t.Fatal("expected displayname but received none")
 	}
 	if !resp.Auth.LeaseOptions.Renewable {
 		t.Fatal("auth should be renewable")
@@ -285,8 +367,8 @@ func LoginSuccess(t *testing.T) {
 	if resp.Auth.LeaseOptions.MaxTTL != 10*time.Second {
 		t.Fatal("max ttl should be 10 seconds")
 	}
-	if resp.Auth.Alias.Name != "vm-ram-i-rj978rorvlg76urhqh7q" {
-		t.Fatalf("expected vm-ram-i-rj978rorvlg76urhqh7q but received %s", resp.Auth.Alias.Name)
+	if resp.Auth.Alias.Name == "" {
+		t.Fatal("expected alias name but received none")
 	}
 }
 
