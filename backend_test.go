@@ -7,11 +7,17 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/logical"
 )
@@ -19,7 +25,11 @@ import (
 const (
 	envVarRunAccTests = "VAULT_ACC"
 
-	envVarAccTestRoleARN   = "VAULT_ACC_TEST_ROLE_ARN"
+	// This role must have trusted actors enabled on it.
+	envVarAccTestRoleARN = "VAULT_ACC_TEST_ROLE_ARN"
+
+	// The access key and secret given must be for someone who is a trusted actor
+	// and thus can assume the given role arn.
 	envVarAccTestAccessKey = "VAULT_ACC_TEST_ACCESS_KEY"
 	envVarAccTestSecretKey = "VAULT_ACC_TEST_SECRET_KEY"
 )
@@ -31,6 +41,7 @@ type testEnv struct {
 	storage logical.Storage
 	backend logical.Backend
 
+	isAccTest bool
 	arn       *arn
 	accessKey string
 	secretKey string
@@ -62,6 +73,7 @@ func TestBackend_Integration(t *testing.T) {
 			}
 			return b
 		}(),
+		isAccTest: false,
 		arn:       arn,
 		accessKey: "somekey",
 		secretKey: "somesecret",
@@ -112,6 +124,7 @@ func TestBackend_Acceptance(t *testing.T) {
 			}
 			return b
 		}(),
+		isAccTest: true,
 		arn:       arn,
 		accessKey: os.Getenv(envVarAccTestAccessKey),
 		secretKey: os.Getenv(envVarAccTestSecretKey),
@@ -283,16 +296,54 @@ func (e *testEnv) ListOfOne(t *testing.T) {
 	if len(resp.Data["keys"].([]string)) != 1 {
 		t.Fatal("1 key should have been returned")
 	}
-	if resp.Data["keys"].([]string)[0] != "elk" {
+	if resp.Data["keys"].([]string)[0] != e.arn.RoleName {
 		t.Fatalf("expected %s but received %s", e.arn.RoleName, resp.Data["keys"].([]string)[0])
 	}
 }
 
 func (e *testEnv) LoginSuccess(t *testing.T) {
-	creds, err := providers.NewConfigurationCredentialProvider(&providers.Configuration{
-		AccessKeyID:     e.accessKey,
-		AccessKeySecret: e.secretKey,
-	}).Retrieve()
+
+	var creds auth.Credential
+	var err error
+
+	if e.isAccTest {
+		// assume the given role so you can authenticate as a member of that role
+		config := sdk.NewConfig()
+		config.Scheme = "https"
+
+		origCreds := credentials.NewAccessKeyCredential(e.accessKey, e.secretKey)
+
+		client, err := sts.NewClientWithOptions("us-west-1", config, origCreds)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		uid, err := uuid.GenerateUUID()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req := sts.CreateAssumeRoleRequest()
+		req.RoleArn = e.arn.String()
+		req.RoleSessionName = strings.Replace(uid, "-", "", -1)
+		resp, err := client.AssumeRole(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		creds, err = providers.NewConfigurationCredentialProvider(&providers.Configuration{
+			AccessKeyID:       resp.Credentials.AccessKeyId,
+			AccessKeySecret:   resp.Credentials.AccessKeySecret,
+			AccessKeyStsToken: resp.Credentials.SecurityToken,
+		}).Retrieve()
+
+	} else {
+		creds, err = providers.NewConfigurationCredentialProvider(&providers.Configuration{
+			// dummy creds are fine
+			AccessKeyID:     e.accessKey,
+			AccessKeySecret: e.secretKey,
+		}).Retrieve()
+	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,9 +382,6 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 	}
 	if resp.Auth.Metadata["account_id"] != e.arn.AccountNumber {
 		t.Fatalf("expected %s but received %s", e.arn.AccountNumber, resp.Auth.Metadata["account_id"])
-	}
-	if resp.Auth.Metadata["user_id"] == "" {
-		t.Fatal("expected user_id but received none")
 	}
 	if resp.Auth.Metadata["role_id"] == "" {
 		t.Fatal("expected role_id but received none")
