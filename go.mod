@@ -9,8 +9,8 @@ require (
 	github.com/hashicorp/go-hclog v0.8.0
 	github.com/hashicorp/go-sockaddr v1.0.2
 	github.com/hashicorp/go-uuid v1.0.1
-	github.com/hashicorp/vault/api v1.0.3-0.20190701222944-a2c7ae6b271d
-	github.com/hashicorp/vault/sdk v0.1.12-0.20190701222944-a2c7ae6b271d
+	github.com/hashicorp/vault/api v1.0.3-0.20190702135302-7cb73f5457c5
+	github.com/hashicorp/vault/sdk v0.1.12-0.20190702135205-50704e612cb9
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
