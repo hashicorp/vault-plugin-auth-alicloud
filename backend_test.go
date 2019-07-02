@@ -188,13 +188,13 @@ func (e *testEnv) ReadRole(t *testing.T) {
 	if resp.Data["policies"].([]string)[0] != "default" {
 		t.Fatalf("expected policy of default but received %s", resp.Data["policies"].([]string)[0])
 	}
-	if resp.Data["ttl"].(time.Duration) != 10 {
+	if resp.Data["ttl"].(int64) != 10 {
 		t.Fatalf("expected ttl of 10 but received %d", resp.Data["ttl"].(time.Duration))
 	}
-	if resp.Data["max_ttl"].(time.Duration) != 10 {
+	if resp.Data["max_ttl"].(int64) != 10 {
 		t.Fatalf("expected max_ttl of 10 but received %d", resp.Data["max_ttl"].(time.Duration))
 	}
-	if resp.Data["period"].(time.Duration) != 1 {
+	if resp.Data["period"].(int64) != 1 {
 		t.Fatalf("expected period of 1 but received %d", resp.Data["period"].(time.Duration))
 	}
 }
@@ -236,13 +236,13 @@ func (e *testEnv) ReadUpdatedRole(t *testing.T) {
 	if resp.Data["policies"].([]string)[0] != "default" {
 		t.Fatalf("expected policy of default but received %s", resp.Data["policies"].([]string)[0])
 	}
-	if resp.Data["ttl"].(time.Duration) != 10 {
+	if resp.Data["ttl"].(int64) != 10 {
 		t.Fatalf("expected ttl of 10 but received %d", resp.Data["ttl"].(time.Duration))
 	}
-	if resp.Data["max_ttl"].(time.Duration) != 100 {
+	if resp.Data["max_ttl"].(int64) != 100 {
 		t.Fatalf("expected max_ttl of 100 but received %d", resp.Data["max_ttl"].(time.Duration))
 	}
-	if resp.Data["period"].(time.Duration) != 1 {
+	if resp.Data["period"].(int64) != 1 {
 		t.Fatalf("expected period of 1 but received %d", resp.Data["period"].(time.Duration))
 	}
 }
