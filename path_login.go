@@ -98,8 +98,9 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	}
 
 	if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.TokenBoundCIDRs) {
-		return nil, errors.New("login request originated from invalid CIDR")
+		return nil, logical.ErrPermissionDenied
 	}
+
 	if !parsedARN.IsMemberOf(role.ARN) {
 		return nil, errors.New("the caller's arn does not match the role's arn")
 	}
