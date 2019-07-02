@@ -97,7 +97,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("entry for role %s not found", parsedARN.RoleName)
 	}
 
-	if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.BoundCIDRs) {
+	if !cidrutil.RemoteAddrIsOk(req.Connection.RemoteAddr, role.TokenBoundCIDRs) {
 		return nil, errors.New("login request originated from invalid CIDR")
 	}
 	if !parsedARN.IsMemberOf(role.ARN) {
