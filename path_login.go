@@ -39,43 +39,52 @@ has included a signature.`,
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation: b.pathLoginUpdate,
+			logical.UpdateOperation:      b.pathLoginUpdate,
+			logical.ResolveRoleOperation: b.pathLoginResolveRole,
 		},
 		HelpSynopsis:    pathLoginSyn,
 		HelpDescription: pathLoginDesc,
 	}
 }
 
-func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	_, _, roleName, err := b.getCallerIdARNRoleNameFromLoginRequest(data)
+	if err != nil {
+		return nil, err
+	}
 
+	return logical.ResolveRoleResponse(roleName)
+}
+
+func (b *backend) getCallerIdARNRoleNameFromLoginRequest(data *framework.FieldData) (*sts.GetCallerIdentityResponse, *arn, string, error) {
 	b64URL := data.Get("identity_request_url").(string)
 	if b64URL == "" {
-		return nil, errors.New("missing identity_request_url")
+		return nil, nil, "", errors.New("missing identity_request_url")
 	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+		return nil, nil, "", errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+		return nil, nil, "", errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
 	}
 
 	header := data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
-		return nil, errors.New("missing identity_request_headers")
+		return nil, nil, "", errors.New("missing identity_request_headers")
 	}
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
 	if err != nil {
-		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
+		return nil, nil, "", errwrap.Wrapf("error making upstream request: {{err}}", err)
 	}
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
+		return nil, nil, "", errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
-		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
+		return nil, nil, "", fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
 	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
@@ -87,6 +96,14 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	}
 	if roleName == "" {
 		roleName = parsedARN.RoleName
+	}
+	return callerIdentity, parsedARN, roleName, nil
+}
+
+func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	callerIdentity, parsedARN, roleName, err := b.getCallerIdARNRoleNameFromLoginRequest(data)
+	if err != nil {
+		return nil, err
 	}
 
 	role, err := readRole(ctx, req.Storage, roleName)
