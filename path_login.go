@@ -48,43 +48,34 @@ has included a signature.`,
 }
 
 func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	_, _, roleName, err := b.getCallerIdARNRoleNameFromLoginRequest(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return logical.ResolveRoleResponse(roleName)
-}
-
-func (b *backend) getCallerIdARNRoleNameFromLoginRequest(data *framework.FieldData) (*sts.GetCallerIdentityResponse, *arn, string, error) {
 	b64URL := data.Get("identity_request_url").(string)
 	if b64URL == "" {
-		return nil, nil, "", errors.New("missing identity_request_url")
+		return logical.ErrorResponse("missing identity_request_url"), nil
 	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, nil, "", errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+		return logical.ErrorResponse("failed to base64 decode identity_request_url: %v", err), nil
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, nil, "", errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+		return logical.ErrorResponse("error parsing identity_request_url: %v", err), nil
 	}
 
 	header := data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
-		return nil, nil, "", errors.New("missing identity_request_headers")
+		return logical.ErrorResponse("missing identity_request_headers"), nil
 	}
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
 	if err != nil {
-		return nil, nil, "", errwrap.Wrapf("error making upstream request: {{err}}", err)
+		return nil, fmt.Errorf("error making upstream request: %w", err)
 	}
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, nil, "", errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
+		return nil, fmt.Errorf("unable to parse entity's arn %s due to %w", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
-		return nil, nil, "", fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
+		return logical.ErrorResponse("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type), nil
 	}
 
 	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
@@ -97,13 +88,58 @@ func (b *backend) getCallerIdARNRoleNameFromLoginRequest(data *framework.FieldDa
 	if roleName == "" {
 		roleName = parsedARN.RoleName
 	}
-	return callerIdentity, parsedARN, roleName, nil
+
+	role, err := readRole(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil {
+		return logical.ErrorResponse("entry for role %s not found", roleName), nil
+	}
+
+	return logical.ResolveRoleResponse(roleName)
 }
 
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	callerIdentity, parsedARN, roleName, err := b.getCallerIdARNRoleNameFromLoginRequest(data)
+	b64URL := data.Get("identity_request_url").(string)
+	if b64URL == "" {
+		return nil, errors.New("missing identity_request_url")
+	}
+	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, err
+		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+	}
+	if _, err := url.Parse(string(identityReqURL)); err != nil {
+		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+	}
+
+	header := data.Get("identity_request_headers").(http.Header)
+	if len(header) == 0 {
+		return nil, errors.New("missing identity_request_headers")
+	}
+
+	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
+	if err != nil {
+		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
+	}
+
+	parsedARN, err := parseARN(callerIdentity.Arn)
+	if err != nil {
+		return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
+	}
+	if parsedARN.Type != arnTypeAssumedRole {
+		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
+	}
+
+	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
+	// in the ARN returned by the GetCallerIdentity call.
+	roleName := ""
+	roleNameIfc, ok := data.GetOk("role")
+	if ok {
+		roleName = roleNameIfc.(string)
+	}
+	if roleName == "" {
+		roleName = parsedARN.RoleName
 	}
 
 	role, err := readRole(ctx, req.Storage, roleName)
