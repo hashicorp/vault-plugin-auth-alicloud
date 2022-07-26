@@ -47,6 +47,10 @@ has included a signature.`,
 	}
 }
 
+// pathLoginResolveRole will identify the role that pathLoginUpdate will use to log-in
+// Note: Most of this function is duplicated logic. The reason for this is so that callers
+// to this function receive logical errors instead of internal server errors where appropriate
+// logic updates relating to role determination should be kept consistent between the two.
 func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	b64URL := data.Get("identity_request_url").(string)
 	if b64URL == "" {
