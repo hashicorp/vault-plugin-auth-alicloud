@@ -239,13 +239,6 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf(`expected "https" url scheme but received "%s"`, u.Scheme)
 	}
-	stsEndpoint, err := getSTSEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	if u.Host != stsEndpoint {
-		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
-	}
 	q := u.Query()
 	if q.Get("Format") != "JSON" {
 		return nil, fmt.Errorf("query Format must be JSON but received %s", q.Get("Format"))
