@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
@@ -239,14 +238,18 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf(`expected "https" url scheme but received "%s"`, u.Scheme)
 	}
-	stsEndpoint, err := getSTSEndpoint()
+	q := u.Query()
+	regionID := q.Get("RegionId")
+	if regionID == "" {
+		return nil, fmt.Errorf("query RegionId must be provided")
+	}
+	stsEndpoint, err := getSTSEndpoint(regionID)
 	if err != nil {
 		return nil, err
 	}
 	if u.Host != stsEndpoint {
-		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
+		return nil, fmt.Errorf(`expected host of "%s" but received "%s"`, stsEndpoint, u.Host)
 	}
-	q := u.Query()
 	if q.Get("Format") != "JSON" {
 		return nil, fmt.Errorf("query Format must be JSON but received %s", q.Get("Format"))
 	}
@@ -281,21 +284,8 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	return result, nil
 }
 
-func getSTSEndpoint() (string, error) {
-	r := &endpoints.LocalGlobalResolver{}
-	endpoint, supported, err := r.TryResolve(&endpoints.ResolveParam{
-		Product: "sts",
-	})
-	if err != nil {
-		return "", err
-	}
-	if !supported {
-		return "", errors.New("sts endpoint is no longer supported")
-	}
-	if endpoint == "" {
-		return "", errors.New("got an empty endpoint")
-	}
-	return endpoint, nil
+func getSTSEndpoint(regionID string) (string, error) {
+	return EndpointMap[regionID], nil
 }
 
 const pathLoginSyn = `
