@@ -347,7 +347,7 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := tools.GenerateLoginDataInternal(e.arn.RoleName, creds, "us-west-2")
+	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,11 +355,7 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 		Operation: logical.UpdateOperation,
 		Path:      "login",
 		Storage:   e.storage,
-		Data: map[string]interface{}{
-			"role":                     data.Role,
-			"identity_request_url":     data.B64URL,
-			"identity_request_headers": data.Header,
-		},
+		Data:      data,
 		Connection: &logical.Connection{
 			RemoteAddr: "127.0.0.1/24",
 		},

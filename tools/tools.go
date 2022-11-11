@@ -63,44 +63,6 @@ func GenerateLoginData(role string, creds auth.Credential, region string) (map[s
 	}, nil
 }
 
-// GenerateLoginDataInternal generates the necessary data to send to the Vault
-// server for generating a token.
-func GenerateLoginDataInternal(role string, creds auth.Credential, region string) (*LoginData, error) {
-	config := sdk.NewConfig()
-
-	// This call always must be https but the config doesn't default to that.
-	config.Scheme = "https"
-
-	// Prepare to record the request using a proxy that will capture it and throw an error so it's not executed.
-	capturer := &RequestCapturer{}
-	transport := &http.Transport{}
-	transport.Proxy = capturer.Proxy
-	config.HttpTransport = transport
-
-	client, err := sts.NewClientWithOptions(region, config, creds)
-	if err != nil {
-		return nil, err
-	}
-
-	// This method returns a response and an error. We're ignoring both because the response
-	// will always be nil here, and the error will always be the error thrown by the Proxy
-	// method below. We don't care about either of them, we just care about firing the request
-	// so we can capture it on the way out and retrieve it for further use.
-	client.GetCallerIdentity(sts.CreateGetCallerIdentityRequest())
-
-	getCallerIdentityRequest, err := capturer.GetCapturedRequest()
-	if err != nil {
-		return nil, err
-	}
-
-	u := base64.StdEncoding.EncodeToString([]byte(getCallerIdentityRequest.URL.String()))
-	return &LoginData{
-		Role:   role,
-		B64URL: u,
-		Header: getCallerIdentityRequest.Header,
-	}, nil
-}
-
 /*
 RequestCapturer fulfills the Proxy method of http.Transport, so can be used to replace
 the Proxy method on any transport method to simply capture the request.

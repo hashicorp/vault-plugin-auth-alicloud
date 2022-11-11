@@ -21,47 +21,51 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
+func getSchema() map[string]*framework.FieldSchema {
+	return map[string]*framework.FieldSchema{
+		"role": {
+			Type: framework.TypeString,
+			Description: `Name of the role against which the login is being attempted.
+If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by 
+the GetCallerIdentity request. If a matching role is not found, login fails.`,
+		},
+		"identity_request_url": {
+			Type:        framework.TypeString,
+			Description: "Base64-encoded full URL against which to make the AliCloud request.",
+		},
+		"identity_request_headers": {
+			Type: framework.TypeHeader,
+			Description: `The request headers. This must include the headers over which AliCloud
+has included a signature.`,
+		},
+		// internal fields used for the login path to generate login data.
+		"generate_login_data": {
+			Type:        framework.TypeBool,
+			Description: "Flag for the login path to know we must generate login data.",
+		},
+		"access_key": {
+			Type:        framework.TypeString,
+			Description: ``,
+		},
+		"secret_key": {
+			Type:        framework.TypeString,
+			Description: ``,
+		},
+		"security_token": {
+			Type:        framework.TypeString,
+			Description: ``,
+		},
+		"region": {
+			Type:        framework.TypeString,
+			Description: ``,
+		},
+	}
+}
+
 func pathLogin(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "login$",
-		Fields: map[string]*framework.FieldSchema{
-			"role": {
-				Type: framework.TypeString,
-				Description: `Name of the role against which the login is being attempted.
-If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by 
-the GetCallerIdentity request. If a matching role is not found, login fails.`,
-			},
-			"identity_request_url": {
-				Type:        framework.TypeString,
-				Description: "Base64-encoded full URL against which to make the AliCloud request.",
-			},
-			"identity_request_headers": {
-				Type: framework.TypeHeader,
-				Description: `The request headers. This must include the headers over which AliCloud
-has included a signature.`,
-			},
-			// internal fields used for the login path to generate login data.
-			"generate_login_data": {
-				Type:        framework.TypeBool,
-				Description: "Flag for the login path to know we must generate login data.",
-			},
-			"access_key": {
-				Type:        framework.TypeString,
-				Description: ``,
-			},
-			"secret_key": {
-				Type:        framework.TypeString,
-				Description: ``,
-			},
-			"security_token": {
-				Type:        framework.TypeString,
-				Description: ``,
-			},
-			"region": {
-				Type:        framework.TypeString,
-				Description: ``,
-			},
-		},
+		Fields:  getSchema(),
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation:      b.pathLoginUpdate,
 			logical.ResolveRoleOperation: b.pathLoginResolveRole,
@@ -85,24 +89,23 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 		// vault login command was issued so we attempt to generate the signed request
 		loginData, err := GenerateLoginData(req, data)
 		if err != nil {
-			return nil, errors.New("error generating login data")
+			return nil, fmt.Errorf("error generating login data: %w", err)
 		}
-		b64URL = loginData.B64URL
-		header = loginData.Header
-	} else {
-		b64URL = data.Get("identity_request_url").(string)
-		if b64URL == "" {
-			return nil, errors.New("missing identity_request_url")
-		}
-		header = data.Get("identity_request_headers").(http.Header)
+		data = loginData
 	}
 
+	b64URL = data.Get("identity_request_url").(string)
+	if b64URL == "" {
+		return nil, errors.New("missing identity_request_url")
+	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
+
+	header = data.Get("identity_request_headers").(http.Header)
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("resolverole error parsing identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
 	}
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
@@ -143,7 +146,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	return logical.ResolveRoleResponse(roleName)
 }
 
-func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*tools.LoginData, error) {
+func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*framework.FieldData, error) {
 	accessKey := data.Get("access_key").(string)
 	if accessKey == "" {
 		return nil, errors.New("missing access_key")
@@ -177,11 +180,16 @@ func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*tools.
 		return nil, err
 	}
 
-	loginData, err := tools.GenerateLoginDataInternal(role, creds, region)
+	loginData, err := tools.GenerateLoginData(role, creds, region)
 	if err != nil {
 		return nil, err
 	}
-	return loginData, nil
+
+	d := &framework.FieldData{
+		Raw:    loginData,
+		Schema: getSchema(),
+	}
+	return d, nil
 }
 
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
@@ -194,24 +202,23 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		// vault login command was issued so we attempt to generate the signed request
 		loginData, err := GenerateLoginData(req, data)
 		if err != nil {
-			return nil, errors.New("error generating login data")
+			return nil, fmt.Errorf("error generating login data: %w", err)
 		}
-		b64URL = loginData.B64URL
-		header = loginData.Header
-	} else {
-		b64URL = data.Get("identity_request_url").(string)
-		if b64URL == "" {
-			return nil, errors.New("missing identity_request_url")
-		}
-		header = data.Get("identity_request_headers").(http.Header)
+		data = loginData
 	}
 
+	b64URL = data.Get("identity_request_url").(string)
+	if b64URL == "" {
+		return nil, errors.New("missing identity_request_url")
+	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
+
+	header = data.Get("identity_request_headers").(http.Header)
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("loginupdate error parsing identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
 	}
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
