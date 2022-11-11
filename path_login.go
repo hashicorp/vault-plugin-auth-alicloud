@@ -88,7 +88,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 			return nil, errors.New("error generating login data")
 		}
 		b64URL = loginData.B64URL
-		b64URL = loginData.Header
+		header = loginData.Header
 	} else {
 		b64URL = data.Get("identity_request_url").(string)
 		if b64URL == "" {
@@ -102,7 +102,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+		return nil, errwrap.Wrapf("resolverole error parsing identity_request_url: {{err}}", err)
 	}
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
@@ -177,7 +177,7 @@ func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*tools.
 		return nil, err
 	}
 
-	loginData, err := tools.GenerateLoginData(role, creds, region)
+	loginData, err := tools.GenerateLoginDataInternal(role, creds, region)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 			return nil, errors.New("error generating login data")
 		}
 		b64URL = loginData.B64URL
-		b64URL = loginData.Header
+		header = loginData.Header
 	} else {
 		b64URL = data.Get("identity_request_url").(string)
 		if b64URL == "" {
@@ -211,7 +211,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+		return nil, errwrap.Wrapf("loginupdate error parsing identity_request_url: {{err}}", err)
 	}
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")

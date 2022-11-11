@@ -347,7 +347,7 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-west-2")
+	data, err := tools.GenerateLoginDataInternal(e.arn.RoleName, creds, "us-west-2")
 	if err != nil {
 		t.Fatal(err)
 	}
