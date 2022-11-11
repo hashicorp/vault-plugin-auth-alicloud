@@ -389,7 +389,7 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 // https://www.alibabacloud.com/help/en/resource-access-management/latest/api-doc-sts-2015-04-01-endpoint
 //
 // Alicloud Support said that there is not an API to fetch all sts endpoints.
-// See the githbu ticket at: https://github.com/aliyun/alibaba-cloud-sdk-go/issues/577
+// See the github ticket at: https://github.com/aliyun/alibaba-cloud-sdk-go/issues/577
 func getSTSEndpoint(regionID string) (string, error) {
 	config := sdk.NewConfig()
 	config.Scheme = "https"
