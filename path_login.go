@@ -76,21 +76,36 @@ has included a signature.`,
 // to this function receive logical errors instead of internal server errors where appropriate
 // logic updates relating to role determination should be kept consistent between the two.
 func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	b64URL := data.Get("identity_request_url").(string)
-	if b64URL == "" {
-		return logical.ErrorResponse("missing identity_request_url"), nil
-	}
-	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
-	if err != nil {
-		return logical.ErrorResponse("failed to base64 decode identity_request_url: %v", err), nil
-	}
-	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return logical.ErrorResponse("error parsing identity_request_url: %v", err), nil
+	var err error
+	var b64URL string
+	var header http.Header
+
+	generateData := data.Get("generate_login_data").(bool)
+	if generateData {
+		// vault login command was issued so we attempt to generate the signed request
+		loginData, err := b.generateLoginData(req, data)
+		if err != nil {
+			return nil, errors.New("error generating login data")
+		}
+		b64URL = loginData.B64URL
+		b64URL = loginData.Header
+	} else {
+		b64URL = data.Get("identity_request_url").(string)
+		if b64URL == "" {
+			return nil, errors.New("missing identity_request_url")
+		}
+		header = data.Get("identity_request_headers").(http.Header)
 	}
 
-	header := data.Get("identity_request_headers").(http.Header)
+	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
+	if err != nil {
+		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+	}
+	if _, err := url.Parse(string(identityReqURL)); err != nil {
+		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+	}
 	if len(header) == 0 {
-		return logical.ErrorResponse("missing identity_request_headers"), nil
+		return nil, errors.New("missing identity_request_headers")
 	}
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
