@@ -302,7 +302,6 @@ func (e *testEnv) ListOfOne(t *testing.T) {
 }
 
 func (e *testEnv) LoginSuccess(t *testing.T) {
-
 	var creds auth.Credential
 	var err error
 
@@ -356,7 +355,11 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 		Operation: logical.UpdateOperation,
 		Path:      "login",
 		Storage:   e.storage,
-		Data:      data,
+		Data: map[string]interface{}{
+			"role":                     data.Role,
+			"identity_request_url":     data.B64URL,
+			"identity_request_headers": data.Header,
+		},
 		Connection: &logical.Connection{
 			RemoteAddr: "127.0.0.1/24",
 		},

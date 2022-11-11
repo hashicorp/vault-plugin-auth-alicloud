@@ -83,7 +83,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	generateData := data.Get("generate_login_data").(bool)
 	if generateData {
 		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := b.generateLoginData(req, data)
+		loginData, err := GenerateLoginData(req, data)
 		if err != nil {
 			return nil, errors.New("error generating login data")
 		}
@@ -143,7 +143,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	return logical.ResolveRoleResponse(roleName)
 }
 
-func (b *backend) generateLoginData(req *logical.Request, data *framework.FieldData) (*tools.LoginData, error) {
+func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*tools.LoginData, error) {
 	accessKey := data.Get("access_key").(string)
 	if accessKey == "" {
 		return nil, errors.New("missing access_key")
@@ -192,7 +192,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	generateData := data.Get("generate_login_data").(bool)
 	if generateData {
 		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := b.generateLoginData(req, data)
+		loginData, err := GenerateLoginData(req, data)
 		if err != nil {
 			return nil, errors.New("error generating login data")
 		}
