@@ -12,12 +12,17 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 )
 
+type LoginData struct {
+	Role   string
+	B64URL string
+	Header string
+}
+
 // Generates the necessary data to send to the Vault server for generating a token.
 // This is useful for other API clients to use.
 // If "" is passed in for accessKeyID, accessKeySecret, and securityToken,
 // attempts to use credentials set as env vars or available through instance metadata.
-func GenerateLoginData(role string, creds auth.Credential, region string) (map[string]interface{}, error) {
-
+func GenerateLoginData(role string, creds auth.Credential, region string) (*LoginData, error) {
 	config := sdk.NewConfig()
 
 	// This call always must be https but the config doesn't default to that.
@@ -50,11 +55,11 @@ func GenerateLoginData(role string, creds auth.Credential, region string) (map[s
 	if err != nil {
 		return nil, err
 	}
-	headers := base64.StdEncoding.EncodeToString(b)
-	return map[string]interface{}{
-		"role":                     role,
-		"identity_request_url":     u,
-		"identity_request_headers": headers,
+	header := base64.StdEncoding.EncodeToString(b)
+	return &LoginData{
+		Role:   role,
+		B64URL: u,
+		Header: header,
 	}, nil
 }
 

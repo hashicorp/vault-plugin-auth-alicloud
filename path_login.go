@@ -12,8 +12,10 @@ import (
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 	"github.com/hashicorp/errwrap"
+	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -37,6 +39,27 @@ the GetCallerIdentity request. If a matching role is not found, login fails.`,
 				Type: framework.TypeHeader,
 				Description: `The request headers. This must include the headers over which AliCloud
 has included a signature.`,
+			},
+			// internal fields used for the login path to generate login data.
+			"generate_login_data": {
+				Type:        framework.TypeBool,
+				Description: "Flag for the login path to know we must generate login data.",
+			},
+			"access_key": {
+				Type:        framework.TypeString,
+				Description: ``,
+			},
+			"secret_key": {
+				Type:        framework.TypeString,
+				Description: ``,
+			},
+			"security_token": {
+				Type:        framework.TypeString,
+				Description: ``,
+			},
+			"region": {
+				Type:        framework.TypeString,
+				Description: ``,
 			},
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
@@ -105,11 +128,69 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	return logical.ResolveRoleResponse(roleName)
 }
 
-func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	b64URL := data.Get("identity_request_url").(string)
-	if b64URL == "" {
-		return nil, errors.New("missing identity_request_url")
+func (b *backend) generateLoginData(req *logical.Request, data *framework.FieldData) (*tools.LoginData, error) {
+	accessKey := data.Get("access_key").(string)
+	if accessKey == "" {
+		return nil, errors.New("missing access_key")
 	}
+	secretKey := data.Get("secret_key").(string)
+	if secretKey == "" {
+		return nil, errors.New("missing secret_key")
+	}
+	securityToken := data.Get("security_token").(string)
+	if securityToken == "" {
+		return nil, errors.New("missing security_token")
+	}
+	region := data.Get("region").(string)
+	if region == "" {
+		return nil, errors.New("missing region")
+	}
+	// The role is not required to be set at this point.
+	role := data.Get("role").(string)
+
+	credentialChain := []providers.Provider{
+		providers.NewConfigurationCredentialProvider(&providers.Configuration{
+			AccessKeyID:       accessKey,
+			AccessKeySecret:   secretKey,
+			AccessKeyStsToken: securityToken,
+		}),
+		providers.NewEnvCredentialProvider(),
+		providers.NewInstanceMetadataProvider(),
+	}
+	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
+	if err != nil {
+		return nil, err
+	}
+
+	loginData, err := tools.GenerateLoginData(role, creds, region)
+	if err != nil {
+		return nil, err
+	}
+	return loginData, nil
+}
+
+func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	var err error
+	var b64URL string
+	var header http.Header
+
+	generateData := data.Get("generate_login_data").(bool)
+	if generateData {
+		// vault login command was issued so we attempt to generate the signed request
+		loginData, err := b.generateLoginData(req, data)
+		if err != nil {
+			return nil, errors.New("error generating login data")
+		}
+		b64URL = loginData.B64URL
+		b64URL = loginData.Header
+	} else {
+		b64URL = data.Get("identity_request_url").(string)
+		if b64URL == "" {
+			return nil, errors.New("missing identity_request_url")
+		}
+		header = data.Get("identity_request_headers").(http.Header)
+	}
+
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
 		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
@@ -117,8 +198,6 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
 		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
 	}
-
-	header := data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
 	}
