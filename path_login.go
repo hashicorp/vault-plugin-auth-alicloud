@@ -25,7 +25,7 @@ func getSchema() map[string]*framework.FieldSchema {
 		"role": {
 			Type: framework.TypeString,
 			Description: `Name of the role against which the login is being attempted.
-If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by 
+If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by
 the GetCallerIdentity request. If a matching role is not found, login fails.`,
 		},
 		"identity_request_url": {
@@ -44,19 +44,19 @@ has included a signature.`,
 		},
 		"access_key": {
 			Type:        framework.TypeString,
-			Description: ``,
+			Description: "AliCloud access key credential.",
 		},
 		"secret_key": {
 			Type:        framework.TypeString,
-			Description: ``,
+			Description: "AliCloud secret key credential.",
 		},
 		"security_token": {
 			Type:        framework.TypeString,
-			Description: ``,
+			Description: "AliCloud security token credential.",
 		},
 		"region": {
 			Type:        framework.TypeString,
-			Description: ``,
+			Description: "AliCloud region.",
 		},
 	}
 }
@@ -86,7 +86,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	generateData := data.Get("generate_login_data").(bool)
 	if generateData {
 		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := GenerateLoginData(req, data)
+		loginData, err := generateLoginData(req, data)
 		if err != nil {
 			return nil, fmt.Errorf("error generating login data: %w", err)
 		}
@@ -144,52 +144,6 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	return logical.ResolveRoleResponse(roleName)
 }
 
-func GenerateLoginData(req *logical.Request, data *framework.FieldData) (*framework.FieldData, error) {
-	accessKey := data.Get("access_key").(string)
-	if accessKey == "" {
-		return nil, errors.New("missing access_key")
-	}
-	secretKey := data.Get("secret_key").(string)
-	if secretKey == "" {
-		return nil, errors.New("missing secret_key")
-	}
-	securityToken := data.Get("security_token").(string)
-	if securityToken == "" {
-		return nil, errors.New("missing security_token")
-	}
-	region := data.Get("region").(string)
-	if region == "" {
-		return nil, errors.New("missing region")
-	}
-	// The role is not required to be set at this point.
-	role := data.Get("role").(string)
-
-	credentialChain := []providers.Provider{
-		providers.NewConfigurationCredentialProvider(&providers.Configuration{
-			AccessKeyID:       accessKey,
-			AccessKeySecret:   secretKey,
-			AccessKeyStsToken: securityToken,
-		}),
-		providers.NewEnvCredentialProvider(),
-		providers.NewInstanceMetadataProvider(),
-	}
-	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
-	if err != nil {
-		return nil, err
-	}
-
-	loginData, err := tools.GenerateLoginData(role, creds, region)
-	if err != nil {
-		return nil, err
-	}
-
-	d := &framework.FieldData{
-		Raw:    loginData,
-		Schema: getSchema(),
-	}
-	return d, nil
-}
-
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	var err error
 	var b64URL string
@@ -198,7 +152,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	generateData := data.Get("generate_login_data").(bool)
 	if generateData {
 		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := GenerateLoginData(req, data)
+		loginData, err := generateLoginData(req, data)
 		if err != nil {
 			return nil, fmt.Errorf("error generating login data: %w", err)
 		}
@@ -384,7 +338,54 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	return result, nil
 }
 
-// getSTSEndpoint will build endpoints from the given region. Using the sts
+// generateLoginData is a helper that returns a new signed GetCallerIdentity request.
+func generateLoginData(req *logical.Request, data *framework.FieldData) (*framework.FieldData, error) {
+	accessKey := data.Get("access_key").(string)
+	if accessKey == "" {
+		return nil, errors.New("missing access_key")
+	}
+	secretKey := data.Get("secret_key").(string)
+	if secretKey == "" {
+		return nil, errors.New("missing secret_key")
+	}
+	securityToken := data.Get("security_token").(string)
+	if securityToken == "" {
+		return nil, errors.New("missing security_token")
+	}
+	region := data.Get("region").(string)
+	if region == "" {
+		return nil, errors.New("missing region")
+	}
+	// The role is not required to be set at this point.
+	role := data.Get("role").(string)
+
+	credentialChain := []providers.Provider{
+		providers.NewConfigurationCredentialProvider(&providers.Configuration{
+			AccessKeyID:       accessKey,
+			AccessKeySecret:   secretKey,
+			AccessKeyStsToken: securityToken,
+		}),
+		providers.NewEnvCredentialProvider(),
+		providers.NewInstanceMetadataProvider(),
+	}
+	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
+	if err != nil {
+		return nil, err
+	}
+
+	loginData, err := tools.GenerateLoginData(role, creds, region)
+	if err != nil {
+		return nil, err
+	}
+
+	d := &framework.FieldData{
+		Raw:    loginData,
+		Schema: getSchema(),
+	}
+	return d, nil
+}
+
+// getSTSEndpoint will build endpoints from the given region using the sts
 // GetEndpointRules API method. See the endpoint docs at:
 // https://www.alibabacloud.com/help/en/resource-access-management/latest/api-doc-sts-2015-04-01-endpoint
 //
@@ -393,6 +394,9 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 func getSTSEndpoint(regionID string) (string, error) {
 	config := sdk.NewConfig()
 	config.Scheme = "https"
+
+	// we don't need real creds because we only need the client to build the
+	// endpoint for the given region
 	creds := credentials.NewAccessKeyCredential("", "")
 	client, err := sts.NewClientWithOptions(regionID, config, creds)
 	if err != nil {
