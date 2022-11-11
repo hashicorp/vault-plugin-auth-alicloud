@@ -95,18 +95,18 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 
 	b64URL = data.Get("identity_request_url").(string)
 	if b64URL == "" {
-		return nil, errors.New("missing identity_request_url")
+		return logical.ErrorResponse("missing identity_request_url"), nil
 	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
+		return logical.ErrorResponse("failed to base64 decode identity_request_url: %v", err), nil
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
+		return logical.ErrorResponse("error parsing identity_request_url: %v", err), nil
 	}
 	header = data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
-		return nil, errors.New("missing identity_request_headers")
+		return logical.ErrorResponse("missing identity_request_headers"), nil
 	}
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
@@ -168,7 +168,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
+		return nil, fmt.Errorf("error parsing identity_request_url: %w", err)
 	}
 	header = data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
