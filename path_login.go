@@ -14,7 +14,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
-	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
@@ -102,11 +101,10 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
-
-	header = data.Get("identity_request_headers").(http.Header)
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
 		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
 	}
+	header = data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
 	}
@@ -215,23 +213,22 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	if err != nil {
 		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
-
-	header = data.Get("identity_request_headers").(http.Header)
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
 		return nil, fmt.Errorf("resolverole error parsing identity_request_url: %w", err)
 	}
+	header = data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
 	}
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
 	if err != nil {
-		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
+		return nil, fmt.Errorf("error making upstream request: %w", err)
 	}
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
+		return nil, fmt.Errorf("unable to parse entity's arn %s due to %w", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
@@ -368,21 +365,21 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 
 	response, err := b.identityClient.Do(request)
 	if err != nil {
-		return nil, errwrap.Wrapf("error making request: {{err}}", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
 		b, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			return nil, errwrap.Wrapf("error reading response body: {{err}}", err)
+			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
 		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
 	}
 
 	result := &sts.GetCallerIdentityResponse{}
 	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
-		return nil, errwrap.Wrapf("error decoding response: {{err}}", err)
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	return result, nil
 }

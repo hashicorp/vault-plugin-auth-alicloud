@@ -12,12 +12,6 @@ import (
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
 )
 
-type LoginData struct {
-	Role   string
-	B64URL string
-	Header http.Header
-}
-
 // Generates the necessary data to send to the Vault server for generating a token.
 // This is useful for other API clients to use.
 // If "" is passed in for accessKeyID, accessKeySecret, and securityToken,
