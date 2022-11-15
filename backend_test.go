@@ -26,10 +26,12 @@ const (
 	envVarRunAccTests = "VAULT_ACC"
 
 	// This role must have trusted actors enabled on it.
+	// See: https://www.alibabacloud.com/help/en/resource-access-management/latest/edit-the-trust-policy-of-a-ram-role
 	envVarAccTestRoleARN = "VAULT_ACC_TEST_ROLE_ARN"
 
-	// The access key and secret given must be for someone who is a trusted actor
-	// and thus can assume the given role arn.
+	// The access key and secret given must be for a trusted actor and thus can
+	// assume the given role arn.
+	// Requires policy: AliyunSTSAssumeRoleAccess
 	envVarAccTestAccessKey = "VAULT_ACC_TEST_ACCESS_KEY"
 	envVarAccTestSecretKey = "VAULT_ACC_TEST_SECRET_KEY"
 )
@@ -347,7 +349,7 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-west-2")
+	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-east-1")
 	if err != nil {
 		t.Fatal(err)
 	}
