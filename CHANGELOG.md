@@ -1,5 +1,8 @@
 ## Unreleased
 
+Change:
+* Require the `role` field on login
+
 Bug Fixes:
 * fix regression in vault login command that caused login to fail
 
