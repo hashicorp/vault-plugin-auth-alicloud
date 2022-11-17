@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/tokenutil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -97,7 +96,6 @@ func (b *backend) operationRoleExistenceCheck(ctx context.Context, req *logical.
 }
 
 func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-
 	roleName := data.Get("role").(string)
 
 	role, err := readRole(ctx, req.Storage, roleName)
@@ -113,7 +111,7 @@ func (b *backend) operationRoleCreateUpdate(ctx context.Context, req *logical.Re
 	if raw, ok := data.GetOk("arn"); ok {
 		arn, err := parseARN(raw.(string))
 		if err != nil {
-			return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse arn %s: {{err}}", arn), err)
+			return nil, fmt.Errorf("unable to parse arn %s: %w", arn, err)
 		}
 		if arn.Type != arnTypeRole {
 			return nil, fmt.Errorf("only role arn types are supported at this time, but %s was provided", role.ARN)

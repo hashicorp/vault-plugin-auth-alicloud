@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -336,17 +336,18 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 			AccessKeySecret:   resp.Credentials.AccessKeySecret,
 			AccessKeyStsToken: resp.Credentials.SecurityToken,
 		}).Retrieve()
-
+		if err != nil {
+			t.Fatal(err)
+		}
 	} else {
 		creds, err = providers.NewConfigurationCredentialProvider(&providers.Configuration{
 			// dummy creds are fine
 			AccessKeyID:     e.accessKey,
 			AccessKeySecret: e.secretKey,
 		}).Retrieve()
-	}
-
-	if err != nil {
-		t.Fatal(err)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-east-1")
@@ -439,7 +440,7 @@ func (f *fauxRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 	resp := &http.Response{
-		Body:       ioutil.NopCloser(bytes.NewReader(b)),
+		Body:       io.NopCloser(bytes.NewReader(b)),
 		StatusCode: 200,
 	}
 	return resp, nil

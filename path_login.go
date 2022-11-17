@@ -6,65 +6,39 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
-	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func getSchema() map[string]*framework.FieldSchema {
-	return map[string]*framework.FieldSchema{
-		"role": {
-			Type: framework.TypeString,
-			Description: `Name of the role against which the login is being attempted.
-If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by
-the GetCallerIdentity request. If a matching role is not found, login fails.`,
-		},
-		"identity_request_url": {
-			Type:        framework.TypeString,
-			Description: "Base64-encoded full URL against which to make the AliCloud request.",
-		},
-		"identity_request_headers": {
-			Type: framework.TypeHeader,
-			Description: `The request headers. This must include the headers over which AliCloud
-has included a signature.`,
-		},
-		// internal fields used for the login path to generate login data.
-		"generate_login_data": {
-			Type:        framework.TypeBool,
-			Description: "Flag for the login path to know we must generate login data.",
-		},
-		"access_key": {
-			Type:        framework.TypeString,
-			Description: "AliCloud access key credential.",
-		},
-		"secret_key": {
-			Type:        framework.TypeString,
-			Description: "AliCloud secret key credential.",
-		},
-		"security_token": {
-			Type:        framework.TypeString,
-			Description: "AliCloud security token credential.",
-		},
-		"region": {
-			Type:        framework.TypeString,
-			Description: "AliCloud region.",
-		},
-	}
-}
-
 func pathLogin(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "login$",
-		Fields:  getSchema(),
+		Fields: map[string]*framework.FieldSchema{
+			"role": {
+				Type: framework.TypeString,
+				Description: `Name of the role against which the login is being attempted.
+If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by
+the GetCallerIdentity request. If a matching role is not found, login fails.`,
+				Required: true,
+			},
+			"identity_request_url": {
+				Type:        framework.TypeString,
+				Description: "Base64-encoded full URL against which to make the AliCloud request.",
+			},
+			"identity_request_headers": {
+				Type: framework.TypeHeader,
+				Description: `The request headers. This must include the headers over which AliCloud
+has included a signature.`,
+			},
+		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.UpdateOperation:      b.pathLoginUpdate,
 			logical.ResolveRoleOperation: b.pathLoginResolveRole,
@@ -75,63 +49,17 @@ func pathLogin(b *backend) *framework.Path {
 }
 
 // pathLoginResolveRole will identify the role that pathLoginUpdate will use to log-in
-// Note: Most of this function is duplicated logic. The reason for this is so that callers
+// Note: Some of this function is duplicated logic. The reason for this is so that callers
 // to this function receive logical errors instead of internal server errors where appropriate
 // logic updates relating to role determination should be kept consistent between the two.
 func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	var err error
-	var b64URL string
-	var header http.Header
 
-	generateData := data.Get("generate_login_data").(bool)
-	if generateData {
-		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := generateLoginData(req, data)
-		if err != nil {
-			return nil, fmt.Errorf("error generating login data: %w", err)
-		}
-		data = loginData
-	}
-
-	b64URL = data.Get("identity_request_url").(string)
-	if b64URL == "" {
-		return logical.ErrorResponse("missing identity_request_url"), nil
-	}
-	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
-	if err != nil {
-		return logical.ErrorResponse("failed to base64 decode identity_request_url: %v", err), nil
-	}
-	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return logical.ErrorResponse("error parsing identity_request_url: %v", err), nil
-	}
-	header = data.Get("identity_request_headers").(http.Header)
-	if len(header) == 0 {
-		return logical.ErrorResponse("missing identity_request_headers"), nil
-	}
-
-	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
-	if err != nil {
-		return nil, fmt.Errorf("error making upstream request: %w", err)
-	}
-
-	parsedARN, err := parseARN(callerIdentity.Arn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse entity's arn %s due to %w", callerIdentity.Arn, err)
-	}
-	if parsedARN.Type != arnTypeAssumedRole {
-		return logical.ErrorResponse("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type), nil
-	}
-
-	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
-	// in the ARN returned by the GetCallerIdentity call.
-	roleName := ""
 	roleNameIfc, ok := data.GetOk("role")
-	if ok {
-		roleName = roleNameIfc.(string)
+	if !ok {
+		return logical.ErrorResponse("missing role"), nil
 	}
-	if roleName == "" {
-		roleName = parsedARN.RoleName
-	}
+	roleName := roleNameIfc.(string)
 
 	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
@@ -145,21 +73,7 @@ func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request
 }
 
 func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	var err error
-	var b64URL string
-	var header http.Header
-
-	generateData := data.Get("generate_login_data").(bool)
-	if generateData {
-		// vault login command was issued so we attempt to generate the signed request
-		loginData, err := generateLoginData(req, data)
-		if err != nil {
-			return nil, fmt.Errorf("error generating login data: %w", err)
-		}
-		data = loginData
-	}
-
-	b64URL = data.Get("identity_request_url").(string)
+	b64URL := data.Get("identity_request_url").(string)
 	if b64URL == "" {
 		return nil, errors.New("missing identity_request_url")
 	}
@@ -170,7 +84,7 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
 		return nil, fmt.Errorf("error parsing identity_request_url: %w", err)
 	}
-	header = data.Get("identity_request_headers").(http.Header)
+	header := data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
 	}
@@ -188,23 +102,18 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
-	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
-	// in the ARN returned by the GetCallerIdentity call.
-	roleName := ""
 	roleNameIfc, ok := data.GetOk("role")
-	if ok {
-		roleName = roleNameIfc.(string)
+	if !ok {
+		return nil, errors.New("missing role")
 	}
-	if roleName == "" {
-		roleName = parsedARN.RoleName
-	}
+	roleName := roleNameIfc.(string)
 
 	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
 	if role == nil {
-		return nil, fmt.Errorf("entry for role %s not found", parsedARN.RoleName)
+		return nil, fmt.Errorf("entry for role %s not found", roleName)
 	}
 
 	if len(role.TokenBoundCIDRs) > 0 {
@@ -297,6 +206,7 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if regionID == "" {
 		return nil, fmt.Errorf("query RegionId must not be empty")
 	}
+
 	stsEndpoint, err := getSTSEndpoint(regionID)
 	if err != nil {
 		return nil, err
@@ -324,7 +234,7 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		b, err := ioutil.ReadAll(response.Body)
+		b, err := io.ReadAll(response.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
@@ -336,53 +246,6 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	return result, nil
-}
-
-// generateLoginData is a helper that returns a new signed GetCallerIdentity request.
-func generateLoginData(req *logical.Request, data *framework.FieldData) (*framework.FieldData, error) {
-	accessKey := data.Get("access_key").(string)
-	if accessKey == "" {
-		return nil, errors.New("missing access_key")
-	}
-	secretKey := data.Get("secret_key").(string)
-	if secretKey == "" {
-		return nil, errors.New("missing secret_key")
-	}
-	securityToken := data.Get("security_token").(string)
-	if securityToken == "" {
-		return nil, errors.New("missing security_token")
-	}
-	region := data.Get("region").(string)
-	if region == "" {
-		return nil, errors.New("missing region")
-	}
-	// The role is not required to be set at this point.
-	role := data.Get("role").(string)
-
-	credentialChain := []providers.Provider{
-		providers.NewConfigurationCredentialProvider(&providers.Configuration{
-			AccessKeyID:       accessKey,
-			AccessKeySecret:   secretKey,
-			AccessKeyStsToken: securityToken,
-		}),
-		providers.NewEnvCredentialProvider(),
-		providers.NewInstanceMetadataProvider(),
-	}
-	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
-	if err != nil {
-		return nil, err
-	}
-
-	loginData, err := tools.GenerateLoginData(role, creds, region)
-	if err != nil {
-		return nil, err
-	}
-
-	d := &framework.FieldData{
-		Raw:    loginData,
-		Schema: getSchema(),
-	}
-	return d, nil
 }
 
 // getSTSEndpoint will build endpoints from the given region using the sts
@@ -409,6 +272,7 @@ func getSTSEndpoint(regionID string) (string, error) {
 	if endpoint == "" {
 		return "", errors.New("got an empty endpoint")
 	}
+
 	return endpoint, nil
 }
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials/providers"
+	"github.com/hashicorp/vault-plugin-auth-alicloud/tools"
 	"github.com/hashicorp/vault/api"
 )
 
@@ -15,19 +17,30 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, erro
 	if !ok {
 		mount = "alicloud"
 	}
+	role := m["role"]
 
-	data := map[string]interface{}{
-		"generate_login_data": true,
-		"access_key":          m["access_key"],
-		"secret_key":          m["secret_key"],
-		"security_token":      m["security_token"],
-		"role":                m["role"],
-		"region":              m["region"],
+	credentialChain := []providers.Provider{
+		providers.NewConfigurationCredentialProvider(&providers.Configuration{
+			AccessKeyID:       m["access_key"],
+			AccessKeySecret:   m["secret_key"],
+			AccessKeyStsToken: m["security_token"],
+		}),
+		providers.NewEnvCredentialProvider(),
+		providers.NewInstanceMetadataProvider(),
+	}
+	creds, err := providers.NewChainProvider(credentialChain).Retrieve()
+	if err != nil {
+		return nil, err
+	}
+
+	loginData, err := tools.GenerateLoginData(role, creds, m["region"])
+	if err != nil {
+		return nil, err
 	}
 
 	path := fmt.Sprintf("auth/%s/login", mount)
 
-	secret, err := c.Logical().Write(path, data)
+	secret, err := c.Logical().Write(path, loginData)
 	if err != nil {
 		return nil, err
 	}
