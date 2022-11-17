@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -26,10 +26,12 @@ const (
 	envVarRunAccTests = "VAULT_ACC"
 
 	// This role must have trusted actors enabled on it.
+	// See: https://www.alibabacloud.com/help/en/resource-access-management/latest/edit-the-trust-policy-of-a-ram-role
 	envVarAccTestRoleARN = "VAULT_ACC_TEST_ROLE_ARN"
 
-	// The access key and secret given must be for someone who is a trusted actor
-	// and thus can assume the given role arn.
+	// The access key and secret given must be for a trusted actor and thus can
+	// assume the given role arn.
+	// Requires policy: AliyunSTSAssumeRoleAccess
 	envVarAccTestAccessKey = "VAULT_ACC_TEST_ACCESS_KEY"
 	envVarAccTestSecretKey = "VAULT_ACC_TEST_SECRET_KEY"
 )
@@ -302,7 +304,6 @@ func (e *testEnv) ListOfOne(t *testing.T) {
 }
 
 func (e *testEnv) LoginSuccess(t *testing.T) {
-
 	var creds auth.Credential
 	var err error
 
@@ -335,20 +336,21 @@ func (e *testEnv) LoginSuccess(t *testing.T) {
 			AccessKeySecret:   resp.Credentials.AccessKeySecret,
 			AccessKeyStsToken: resp.Credentials.SecurityToken,
 		}).Retrieve()
-
+		if err != nil {
+			t.Fatal(err)
+		}
 	} else {
 		creds, err = providers.NewConfigurationCredentialProvider(&providers.Configuration{
 			// dummy creds are fine
 			AccessKeyID:     e.accessKey,
 			AccessKeySecret: e.secretKey,
 		}).Retrieve()
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-west-2")
+	data, err := tools.GenerateLoginData(e.arn.RoleName, creds, "us-east-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -438,7 +440,7 @@ func (f *fauxRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 	resp := &http.Response{
-		Body:       ioutil.NopCloser(bytes.NewReader(b)),
+		Body:       io.NopCloser(bytes.NewReader(b)),
 		StatusCode: 200,
 	}
 	return resp, nil

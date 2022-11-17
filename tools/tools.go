@@ -17,7 +17,6 @@ import (
 // If "" is passed in for accessKeyID, accessKeySecret, and securityToken,
 // attempts to use credentials set as env vars or available through instance metadata.
 func GenerateLoginData(role string, creds auth.Credential, region string) (map[string]interface{}, error) {
-
 	config := sdk.NewConfig()
 
 	// This call always must be https but the config doesn't default to that.

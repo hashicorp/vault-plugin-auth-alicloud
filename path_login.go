@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 
-	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/endpoints"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/sts"
-	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/helper/cidrutil"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -25,8 +25,9 @@ func pathLogin(b *backend) *framework.Path {
 			"role": {
 				Type: framework.TypeString,
 				Description: `Name of the role against which the login is being attempted.
-If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by 
+If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by
 the GetCallerIdentity request. If a matching role is not found, login fails.`,
+				Required: true,
 			},
 			"identity_request_url": {
 				Type:        framework.TypeString,
@@ -52,46 +53,13 @@ has included a signature.`,
 // to this function receive logical errors instead of internal server errors where appropriate
 // logic updates relating to role determination should be kept consistent between the two.
 func (b *backend) pathLoginResolveRole(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	b64URL := data.Get("identity_request_url").(string)
-	if b64URL == "" {
-		return logical.ErrorResponse("missing identity_request_url"), nil
-	}
-	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
-	if err != nil {
-		return logical.ErrorResponse("failed to base64 decode identity_request_url: %v", err), nil
-	}
-	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return logical.ErrorResponse("error parsing identity_request_url: %v", err), nil
-	}
+	var err error
 
-	header := data.Get("identity_request_headers").(http.Header)
-	if len(header) == 0 {
-		return logical.ErrorResponse("missing identity_request_headers"), nil
-	}
-
-	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
-	if err != nil {
-		return nil, fmt.Errorf("error making upstream request: %w", err)
-	}
-
-	parsedARN, err := parseARN(callerIdentity.Arn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse entity's arn %s due to %w", callerIdentity.Arn, err)
-	}
-	if parsedARN.Type != arnTypeAssumedRole {
-		return logical.ErrorResponse("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type), nil
-	}
-
-	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
-	// in the ARN returned by the GetCallerIdentity call.
-	roleName := ""
 	roleNameIfc, ok := data.GetOk("role")
-	if ok {
-		roleName = roleNameIfc.(string)
+	if !ok {
+		return logical.ErrorResponse("missing role"), nil
 	}
-	if roleName == "" {
-		roleName = parsedARN.RoleName
-	}
+	roleName := roleNameIfc.(string)
 
 	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
@@ -111,12 +79,11 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 	}
 	identityReqURL, err := base64.StdEncoding.DecodeString(b64URL)
 	if err != nil {
-		return nil, errwrap.Wrapf("failed to base64 decode identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("failed to base64 decode identity_request_url: %w", err)
 	}
 	if _, err := url.Parse(string(identityReqURL)); err != nil {
-		return nil, errwrap.Wrapf("error parsing identity_request_url: {{err}}", err)
+		return nil, fmt.Errorf("error parsing identity_request_url: %w", err)
 	}
-
 	header := data.Get("identity_request_headers").(http.Header)
 	if len(header) == 0 {
 		return nil, errors.New("missing identity_request_headers")
@@ -124,34 +91,29 @@ func (b *backend) pathLoginUpdate(ctx context.Context, req *logical.Request, dat
 
 	callerIdentity, err := b.getCallerIdentity(header, string(identityReqURL))
 	if err != nil {
-		return nil, errwrap.Wrapf("error making upstream request: {{err}}", err)
+		return nil, fmt.Errorf("error making upstream request: %w", err)
 	}
 
 	parsedARN, err := parseARN(callerIdentity.Arn)
 	if err != nil {
-		return nil, errwrap.Wrapf(fmt.Sprintf("unable to parse entity's arn %s due to {{err}}", callerIdentity.Arn), err)
+		return nil, fmt.Errorf("unable to parse entity's arn %s due to %w", callerIdentity.Arn, err)
 	}
 	if parsedARN.Type != arnTypeAssumedRole {
 		return nil, fmt.Errorf("only %s arn types are supported at this time, but %s was provided", arnTypeAssumedRole, parsedARN.Type)
 	}
 
-	// If a role name was explicitly provided, use that, but otherwise fall back to using the role
-	// in the ARN returned by the GetCallerIdentity call.
-	roleName := ""
 	roleNameIfc, ok := data.GetOk("role")
-	if ok {
-		roleName = roleNameIfc.(string)
+	if !ok {
+		return nil, errors.New("missing role")
 	}
-	if roleName == "" {
-		roleName = parsedARN.RoleName
-	}
+	roleName := roleNameIfc.(string)
 
 	role, err := readRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
 	if role == nil {
-		return nil, fmt.Errorf("entry for role %s not found", parsedARN.RoleName)
+		return nil, fmt.Errorf("entry for role %s not found", roleName)
 	}
 
 	if len(role.TokenBoundCIDRs) > 0 {
@@ -239,14 +201,19 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 	if u.Scheme != "https" {
 		return nil, fmt.Errorf(`expected "https" url scheme but received "%s"`, u.Scheme)
 	}
-	stsEndpoint, err := getSTSEndpoint()
+	q := u.Query()
+	regionID := q.Get("RegionId")
+	if regionID == "" {
+		return nil, fmt.Errorf("query RegionId must not be empty")
+	}
+
+	stsEndpoint, err := getSTSEndpoint(regionID)
 	if err != nil {
 		return nil, err
 	}
 	if u.Host != stsEndpoint {
-		return nil, fmt.Errorf(`expected host of "sts.aliyuncs.com" but received "%s"`, u.Host)
+		return nil, fmt.Errorf(`expected host of "%s" but received "%s"`, stsEndpoint, u.Host)
 	}
-	q := u.Query()
 	if q.Get("Format") != "JSON" {
 		return nil, fmt.Errorf("query Format must be JSON but received %s", q.Get("Format"))
 	}
@@ -262,39 +229,50 @@ func (b *backend) getCallerIdentity(header http.Header, rawURL string) (*sts.Get
 
 	response, err := b.identityClient.Do(request)
 	if err != nil {
-		return nil, errwrap.Wrapf("error making request: {{err}}", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		b, err := ioutil.ReadAll(response.Body)
+		b, err := io.ReadAll(response.Body)
 		if err != nil {
-			return nil, errwrap.Wrapf("error reading response body: {{err}}", err)
+			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
 		return nil, fmt.Errorf("received %d checking caller identity: %s", response.StatusCode, b)
 	}
 
 	result := &sts.GetCallerIdentityResponse{}
 	if err := json.NewDecoder(response.Body).Decode(result); err != nil {
-		return nil, errwrap.Wrapf("error decoding response: {{err}}", err)
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 	return result, nil
 }
 
-func getSTSEndpoint() (string, error) {
-	r := &endpoints.LocalGlobalResolver{}
-	endpoint, supported, err := r.TryResolve(&endpoints.ResolveParam{
-		Product: "sts",
-	})
+// getSTSEndpoint will build endpoints from the given region using the sts
+// GetEndpointRules API method. See the endpoint docs at:
+// https://www.alibabacloud.com/help/en/resource-access-management/latest/api-doc-sts-2015-04-01-endpoint
+//
+// Alicloud Support said that there is not an API to fetch all sts endpoints.
+// See the github ticket at: https://github.com/aliyun/alibaba-cloud-sdk-go/issues/577
+func getSTSEndpoint(regionID string) (string, error) {
+	config := sdk.NewConfig()
+	config.Scheme = "https"
+
+	// we don't need real creds because we only need the client to build the
+	// endpoint for the given region
+	creds := credentials.NewAccessKeyCredential("", "")
+	client, err := sts.NewClientWithOptions(regionID, config, creds)
 	if err != nil {
 		return "", err
 	}
-	if !supported {
-		return "", errors.New("sts endpoint is no longer supported")
+	endpoint, err := client.GetEndpointRules(regionID, "sts")
+	if err != nil {
+		return "", err
 	}
 	if endpoint == "" {
 		return "", errors.New("got an empty endpoint")
 	}
+
 	return endpoint, nil
 }
 
