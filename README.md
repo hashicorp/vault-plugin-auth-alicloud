@@ -48,12 +48,6 @@ For local dev first make sure Go is properly installed, including
 setting up a [GOPATH](https://golang.org/doc/code.html#GOPATH).
 Next, clone this repository into
 `$GOPATH/src/github.com/hashicorp/vault-plugin-auth-alicloud`.
-You can then download any required build tools by bootstrapping your
-environment:
-
-```sh
-$ make bootstrap
-```
 
 To compile a development version of this plugin, run `make` or `make dev`.
 This will put the plugin binary in the `bin` and `$GOPATH/bin` folders. `dev`

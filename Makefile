@@ -1,9 +1,6 @@
 TOOL?=vault-plugin-auth-alibaba
 TEST?=$$(go list ./... | grep -v /vendor/ | grep -v teamcity)
 VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods -nilfunc -printf -rangeloops -shift -structtags -unsafeptr
-EXTERNAL_TOOLS=\
-	github.com/mitchellh/gox \
-	github.com/golang/dep/cmd/dep
 BUILD_TAGS?=${TOOL}
 GOFMT_FILES?=$$(find . -name '*.go' | grep -v vendor)
 
@@ -36,12 +33,6 @@ testcompile: fmtcheck generate
 generate:
 	go generate $(go list ./... | grep -v /vendor/)
 
-# bootstrap the build by downloading additional tools
-bootstrap:
-	@for tool in  $(EXTERNAL_TOOLS) ; do \
-		echo "Installing/Updating $$tool" ; \
-		go get -u $$tool; \
-	done
 
 fmtcheck:
 	@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
@@ -52,4 +43,4 @@ fmt:
 proto:
 	protoc *.proto --go_out=plugins=grpc:.
 
-.PHONY: bin default generate test vet bootstrap fmt fmtcheck
+.PHONY: bin default generate test vet fmt fmtcheck
