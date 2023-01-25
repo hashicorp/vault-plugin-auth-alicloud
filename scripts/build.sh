@@ -3,7 +3,7 @@
 TOOL=vault-plugin-auth-alicloud
 #
 # This script builds the application from source for multiple platforms.
-set -ex
+set -e
 
 GO_CMD=${GO_CMD:-go}
 
