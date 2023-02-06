@@ -1,4 +1,5 @@
-## Unreleased
+## 0.14.0
+### February 6, 2023
 
 Change:
 * Require the `role` field on login
