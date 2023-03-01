@@ -62,26 +62,24 @@ Put the plugin binary into a location of your choice. This directory
 will be specified as the [`plugin_directory`](https://www.vaultproject.io/docs/configuration/index.html#plugin_directory)
 in the Vault config used to start the server.
 
-```json
-...
+```hcl
 plugin_directory = "path/to/plugin/directory"
-...
 ```
 
 Start a Vault server with this config file:
 ```sh
-$ vault server -config=path/to/config.json ...
+$ vault server -config=path/to/config.hcl ...
 ...
 ```
 
-Once the server is started, register the plugin in the Vault server's [plugin catalog](https://www.vaultproject.io/docs/internals/plugins.html#plugin-catalog):
+Once the server is started, register the plugin in the Vault server's [plugin catalog](https://developer.hashicorp.com/vault/docs/plugins/plugin-architecture#plugin-catalog):
 
 ```sh
-$ vault write sys/plugins/catalog/alicloud \
-        sha_256=<expected SHA256 Hex value of the plugin binary> \
-        command="vault-plugin-auth-alicloud"
-...
-Success! Data written to: sys/plugins/catalog/alicloud
+$ vault plugin register \
+        -sha256=<SHA256 Hex value of the plugin binary> \
+        -command="vault-plugin-auth-alicloud" \
+        auth \
+        alicloud
 ```
 
 Note you should generate a new sha256 checksum if you have made changes
