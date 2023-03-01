@@ -63,9 +63,7 @@ will be specified as the [`plugin_directory`](https://www.vaultproject.io/docs/c
 in the Vault config used to start the server.
 
 ```json
-...
 plugin_directory = "path/to/plugin/directory"
-...
 ```
 
 Start a Vault server with this config file:
@@ -74,14 +72,14 @@ $ vault server -config=path/to/config.json ...
 ...
 ```
 
-Once the server is started, register the plugin in the Vault server's [plugin catalog](https://www.vaultproject.io/docs/internals/plugins.html#plugin-catalog):
+Once the server is started, register the plugin in the Vault server's [plugin catalog](https://developer.hashicorp.com/vault/docs/plugins/plugin-architecture#plugin-catalog):
 
 ```sh
-$ vault write sys/plugins/catalog/alicloud \
-        sha_256=<expected SHA256 Hex value of the plugin binary> \
-        command="vault-plugin-auth-alicloud"
-...
-Success! Data written to: sys/plugins/catalog/alicloud
+$ vault plugin register \
+        -sha256=<SHA256 Hex value of the plugin binary> \
+        -command="vault-plugin-auth-alicloud" \
+        auth \
+        alicloud
 ```
 
 Note you should generate a new sha256 checksum if you have made changes
