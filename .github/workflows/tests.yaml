@@ -2,6 +2,9 @@ name: Tests
 
 on: [push, workflow_dispatch]
 
+permissions:
+  contents: read
+
 jobs:
   get-go-version:
     name: "Determine Go toolchain version"
