@@ -17,7 +17,7 @@ jobs:
         id: get-go-version
         run: |
           echo "Building with Go $(cat .go-version)"
-          echo "go-version=$(cat .go-version)" >> $GITHUB_OUTPUT
+          echo "go-version=$(cat .go-version)" >> "$GITHUB_OUTPUT"
   run-tests:
     name: "Run Tests"
     runs-on: ubuntu-latest
