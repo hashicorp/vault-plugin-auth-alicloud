@@ -1,7 +1,7 @@
 name: Tests
 
 on:
-  workflow_call: {}
+  push:
 
 permissions:
   contents: read
