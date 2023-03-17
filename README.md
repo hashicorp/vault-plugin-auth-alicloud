@@ -117,3 +117,27 @@ You can also specify a `TESTARGS` variable to filter tests like so:
 ```sh
 $ make test TESTARGS='--run=TestConfig'
 ```
+
+#### Acceptance Tests
+
+**Warning:** The acceptance tests create/destroy/modify *real resources*,
+which may incur real costs in some cases. In the presence of a bug,
+it is technically possible that broken backends could leave dangling
+data behind. Therefore, please run the acceptance tests at your own risk.
+At the very least, we recommend running them in their own private
+account for whatever backend you're testing.
+
+Acceptance tests require the following environment variables.
+```sh
+export VAULT_ACC_TEST_ROLE_ARN=<myrolearn>
+export VAULT_ACC_TEST_ACCESS_KEY_ID=<myaccesskeyid>
+export VAULT_ACC_TEST_SECRET_KEY=<mysecretkey>
+export VAULT_ACC=1
+```
+
+To run the acceptance tests, invoke `make testacc`:
+
+```sh
+$ make testacc
+```
+
