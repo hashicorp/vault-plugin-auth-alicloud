@@ -35,8 +35,8 @@ const (
 	// The access key and secret given must be for a trusted actor and thus can
 	// assume the given role arn.
 	// Requires policy: AliyunSTSAssumeRoleAccess
-	envVarAccTestAccessKey = "VAULT_ACC_TEST_ACCESS_KEY"
-	envVarAccTestSecretKey = "VAULT_ACC_TEST_SECRET_KEY"
+	envVarAccTestAccessKeyID = "VAULT_ACC_TEST_ACCESS_KEY_ID"
+	envVarAccTestSecretKey   = "VAULT_ACC_TEST_SECRET_KEY"
 )
 
 var runAcceptanceTests = os.Getenv(envVarRunAccTests) == "1"
@@ -131,7 +131,7 @@ func TestBackend_Acceptance(t *testing.T) {
 		}(),
 		isAccTest: true,
 		arn:       arn,
-		accessKey: os.Getenv(envVarAccTestAccessKey),
+		accessKey: os.Getenv(envVarAccTestAccessKeyID),
 		secretKey: os.Getenv(envVarAccTestSecretKey),
 	}
 
