@@ -129,9 +129,9 @@ account for whatever backend you're testing.
 
 Acceptance tests require the following environment variables.
 ```sh
-export VAULT_ACC_TEST_ROLE_ARN=<myrolearn>
-export VAULT_ACC_TEST_ACCESS_KEY_ID=<myaccesskeyid>
-export VAULT_ACC_TEST_SECRET_KEY=<mysecretkey>
+export VAULT_AUTH_ACC_TEST_ROLE_ARN=<myrolearn>
+export VAULT_AUTH_ACC_TEST_ACCESS_KEY_ID=<myaccesskeyid>
+export VAULT_AUTH_ACC_TEST_SECRET_KEY=<mysecretkey>
 export VAULT_ACC=1
 ```
 
