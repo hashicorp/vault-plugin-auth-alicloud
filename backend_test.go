@@ -30,13 +30,13 @@ const (
 
 	// This role must have trusted actors enabled on it.
 	// See: https://www.alibabacloud.com/help/en/resource-access-management/latest/edit-the-trust-policy-of-a-ram-role
-	envVarAccTestRoleARN = "VAULT_ACC_TEST_ROLE_ARN"
+	envVarAccTestRoleARN = "VAULT_AUTH_ACC_TEST_ROLE_ARN"
 
 	// The access key and secret given must be for a trusted actor and thus can
 	// assume the given role arn.
 	// Requires policy: AliyunSTSAssumeRoleAccess
-	envVarAccTestAccessKeyID = "VAULT_ACC_TEST_ACCESS_KEY_ID"
-	envVarAccTestSecretKey   = "VAULT_ACC_TEST_SECRET_KEY"
+	envVarAccTestAccessKeyID = "VAULT_AUTH_ACC_TEST_ACCESS_KEY_ID"
+	envVarAccTestSecretKey   = "VAULT_AUTH_ACC_TEST_SECRET_KEY"
 )
 
 var runAcceptanceTests = os.Getenv(envVarRunAccTests) == "1"
