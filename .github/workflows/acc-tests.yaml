@@ -1,5 +1,6 @@
 name: Run Acceptance Tests
 on:
+  workflow_dispatch:
   push:
 
 permissions:
