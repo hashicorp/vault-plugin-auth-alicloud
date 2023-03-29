@@ -16,6 +16,10 @@ import (
 func pathRole(b *backend) *framework.Path {
 	p := &framework.Path{
 		Pattern: "role/" + framework.GenericNameRegex("role"),
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAliCloudAuth,
+			OperationSuffix: "role",
+		},
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
 				Type:        framework.TypeLowerCaseString,
@@ -69,6 +73,11 @@ func pathRole(b *backend) *framework.Path {
 func pathListRole(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "role/?",
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAliCloudAuth,
+			OperationVerb:   "list",
+			OperationSuffix: "roles",
+		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ListOperation: b.operationRoleList,
 		},
@@ -80,6 +89,11 @@ func pathListRole(b *backend) *framework.Path {
 func pathListRoles(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "roles/?",
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAliCloudAuth,
+			OperationVerb:   "list",
+			OperationSuffix: "roles2",
+		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ListOperation: b.operationRoleList,
 		},
