@@ -17,8 +17,8 @@ func pathRole(b *backend) *framework.Path {
 	p := &framework.Path{
 		Pattern: "role/" + framework.GenericNameRegex("role"),
 		DisplayAttrs: &framework.DisplayAttributes{
-			OperationPrefix: operationPrefixAliCloudAuth,
-			OperationSuffix: "role",
+			OperationPrefix: operationPrefixAliCloud,
+			OperationSuffix: "auth-role",
 		},
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
@@ -74,9 +74,9 @@ func pathListRole(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "role/?",
 		DisplayAttrs: &framework.DisplayAttributes{
-			OperationPrefix: operationPrefixAliCloudAuth,
+			OperationPrefix: operationPrefixAliCloud,
 			OperationVerb:   "list",
-			OperationSuffix: "roles",
+			OperationSuffix: "auth-roles",
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ListOperation: b.operationRoleList,
@@ -90,9 +90,9 @@ func pathListRoles(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "roles/?",
 		DisplayAttrs: &framework.DisplayAttributes{
-			OperationPrefix: operationPrefixAliCloudAuth,
+			OperationPrefix: operationPrefixAliCloud,
 			OperationVerb:   "list",
-			OperationSuffix: "roles2",
+			OperationSuffix: "auth-roles2",
 		},
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ListOperation: b.operationRoleList,

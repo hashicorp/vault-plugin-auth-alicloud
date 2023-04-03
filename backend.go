@@ -12,8 +12,8 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-// operationPrefixAliCloudAuth is used as a prefix for OpenAPI operation id's.
-const operationPrefixAliCloudAuth = "ali-cloud-auth"
+// operationPrefixAliCloud is used as a prefix for OpenAPI operation id's.
+const operationPrefixAliCloud = "ali-cloud"
 
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
 	client := cleanhttp.DefaultClient()
