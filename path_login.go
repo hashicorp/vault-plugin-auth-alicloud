@@ -26,7 +26,7 @@ func pathLogin(b *backend) *framework.Path {
 		Pattern: "login$",
 		DisplayAttrs: &framework.DisplayAttributes{
 			OperationPrefix: operationPrefixAliCloud,
-			OperationVerb:   "log-in",
+			OperationVerb:   "login",
 		},
 		Fields: map[string]*framework.FieldSchema{
 			"role": {
