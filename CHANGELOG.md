@@ -1,6 +1,7 @@
 ## Unreleased
 
 ## 0.15.0
+### May 24, 2023
 
 IMPROVEMENTS:
 * enable plugin multiplexing [GH-61](https://github.com/hashicorp/vault-plugin-auth-alicloud/pull/61)
