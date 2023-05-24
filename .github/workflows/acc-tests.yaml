@@ -8,6 +8,7 @@ permissions:
 
 jobs:
   run-acc-tests:
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     env:
       VAULT_AUTH_ACC_TEST_ROLE_ARN: ${{ secrets.VAULT_AUTH_ACC_TEST_ROLE_ARN }}
