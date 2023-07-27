@@ -1,5 +1,14 @@
 ## Unreleased
 
+## 0.16.0
+### July 27, 2023
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * `github.com/aliyun/alibaba-cloud-sdk-go` v1.62.301 -> v1.62.479
+  * `github.com/hashicorp/vault/api` v1.9.1 -> v1.9.2
+  * `github.com/hashicorp/vault/sdk` v0.9.0 -> v0.9.2
+
 ## 0.15.0
 ### May 24, 2023
 
