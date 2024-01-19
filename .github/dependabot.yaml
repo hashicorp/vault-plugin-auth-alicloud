@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "hashicorp/vault-ecosystem-applications"
+
+    groups:
+      dependencies-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      dependencies-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
