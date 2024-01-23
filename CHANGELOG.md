@@ -1,5 +1,22 @@
 ## Unreleased
 
+## 0.16.1
+### Jan, 23 2024
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * github.com/aliyun/alibaba-cloud-sdk-go v1.62.479 -> v1.62.665
+  * github.com/hashicorp/go-hclog v1.5.0 -> v1.6.2
+  * github.com/hashicorp/go-sockaddr v1.0.2 -> v1.0.6
+  * github.com/hashicorp/vault/api v1.9.2 -> v1.10.0
+  * github.com/hashicorp/vault/sdk v0.9.2 -> v0.10.2
+  * golang.org/x/crypto 0.6.0 -> 0.17.0
+  * golang.org/x/net 0.8.0 -> 0.17.0
+  * github.com/go-jose/go-jose/v3 3.0.0 -> 3.0.1
+  * google.golang.org/grpc 1.57.0 -> 1.57.1
+  * github.com/docker/docker 24.0.5+incompatible -> 24.0.7+incompatible
+
+
 ## 0.16.0
 ### July 27, 2023
 
