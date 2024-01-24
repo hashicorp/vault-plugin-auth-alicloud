@@ -3,7 +3,7 @@ module github.com/hashicorp/vault-plugin-auth-alicloud
 go 1.19
 
 require (
-	github.com/aliyun/alibaba-cloud-sdk-go v1.62.665
+	github.com/aliyun/alibaba-cloud-sdk-go v1.62.666
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-hclog v1.6.2
 	github.com/hashicorp/go-sockaddr v1.0.6
