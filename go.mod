@@ -3,12 +3,12 @@ module github.com/hashicorp/vault-plugin-auth-alicloud
 go 1.19
 
 require (
-	github.com/aliyun/alibaba-cloud-sdk-go v1.62.665
+	github.com/aliyun/alibaba-cloud-sdk-go v1.62.676
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/hashicorp/go-hclog v1.6.2
 	github.com/hashicorp/go-sockaddr v1.0.6
 	github.com/hashicorp/go-uuid v1.0.3
-	github.com/hashicorp/vault/api v1.10.0
+	github.com/hashicorp/vault/api v1.11.0
 	github.com/hashicorp/vault/sdk v0.10.2
 )
 
@@ -63,7 +63,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/stretchr/testify v1.8.3 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.9.0 // indirect

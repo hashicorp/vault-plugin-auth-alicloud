@@ -1,7 +1,17 @@
 ## Unreleased
 
+## 0.17.0
+### Feb 2, 2024
+
+IMPROVEMENTS:
+* Updated dependencies:
+  * github.com/aliyun/alibaba-cloud-sdk-go v1.62.665 => v1.62.676
+  * github.com/hashicorp/vault/api v1.10.0 => v1.11.0
+  * github.com/stretchr/testify v1.8.3 => v1.8.4
+
+
 ## 0.16.1
-### Jan, 23 2024
+### Jan 23, 2024
 
 IMPROVEMENTS:
 * Updated dependencies:
