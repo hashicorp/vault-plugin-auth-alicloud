@@ -1,5 +1,8 @@
 ## Unreleased
 
+IMPROVEMENTS:
+* bump github.com/hashicorp/go-plugin v1.5.2 to => v1.6.0 to enable running the plugin in containers
+
 ## 0.17.0
 ### Feb 2, 2024
 
