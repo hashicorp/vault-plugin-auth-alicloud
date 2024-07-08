@@ -32,8 +32,7 @@ func pathLogin(b *backend) *framework.Path {
 			"role": {
 				Type: framework.TypeString,
 				Description: `Name of the role against which the login is being attempted.
-If 'role' is not specified, then the login endpoint looks for a role name in the ARN returned by
-the GetCallerIdentity request. If a matching role is not found, login fails.`,
+If a matching role is not found, login fails.`,
 				Required: true,
 			},
 			"identity_request_url": {
