@@ -1,5 +1,13 @@
 ## Unreleased
 
+## 0.20.0
+### Feb 12, 2025
+
+IMPROVEMENTS:
+* Updated dependencies: 
+  * (https://github.com/hashicorp/vault-plugin-auth-alicloud/pull/131)
+  * (https://github.com/hashicorp/vault-plugin-auth-alicloud/pull/134) 
+
 ## 0.19.0
 ### Sept 3, 2024
 
