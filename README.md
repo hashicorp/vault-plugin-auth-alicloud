@@ -141,3 +141,15 @@ To run the acceptance tests, invoke `make testacc`:
 $ make testacc
 ```
 
+#### Changelogs
+PR's should include a changelog entry. This can be done using changie.
+
+Install changie with homebrew:
+```shell
+brew install changie
+```
+
+Create a new changelog entry:
+```shell
+changie new
+```
