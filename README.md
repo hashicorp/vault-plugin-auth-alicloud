@@ -141,8 +141,6 @@ To run the acceptance tests, invoke `make testacc`:
 $ make testacc
 ```
 
-Can we be a little more explicit here? Something like (with help from google gemini)
-
 ## Updating the Changelog
 
 All pull requests that introduce a user-facing change must include a changelog
