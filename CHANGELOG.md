@@ -1,3 +1,8 @@
+## v0.21.1
+### September 25, 2025
+
+* backport of commit 4d476c18578c757cd84cb4723941332360ef6ef3 (#146)
+
 ## 0.21.0
 ### May 28, 2025
 
