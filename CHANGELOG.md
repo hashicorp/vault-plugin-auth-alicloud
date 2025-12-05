@@ -1,3 +1,15 @@
+## v0.22.0
+### October 1, 2025
+
+* Automated dependency upgrades (#137)
+* [COMPLIANCE] Add Copyright and License Headers (#143)
+* Update changelog for v0.21.1 release (#149)
+* Bump go to 1.25.1 and update indirect dependencies (#144)
+* Add backport assistant workflow (#141)
+* init changie (#142)
+* Add backport assistant workflow (#140)
+* [Compliance] - PR Template Changes Required (#139)
+
 ## v0.21.1
 ### September 25, 2025
 
