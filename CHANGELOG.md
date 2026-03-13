@@ -1,6 +1,6 @@
 ## Unreleased
 ## v0.23.0
-### Mar 16, 2025
+### March 16, 2026
 
 IMPROVEMENTS:
 * Updated dependencies:
