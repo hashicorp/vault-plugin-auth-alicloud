@@ -1,3 +1,8 @@
+## v0.23.1
+### March 19, 2026
+
+* prepare v0.23.1 release (#157)
+
 ## Unreleased
 
 ## v0.23.1
