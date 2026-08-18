@@ -70,7 +70,7 @@ has included a signature.`,
 								Description: "Token policies associated with the issued token.",
 							},
 							"metadata": {
-								Type: framework.TypeMap,
+								Type:        framework.TypeMap,
 								Description: "Metadata associated with the issued token, including account_id, user_id, role_id, arn, identity_type, principal_id, request_id, and role_name.",
 							},
 							"lease_duration": {
