@@ -14,6 +14,73 @@ import (
 )
 
 func pathRole(b *backend) *framework.Path {
+	roleResponseFields := map[string]*framework.FieldSchema{
+		"arn": {
+			Type:        framework.TypeString,
+			Description: "ARN of the RAM role bound to this role.",
+		},
+		"policies": {
+			Type:        framework.TypeSlice,
+			Description: "Token policies associated with this role.",
+		},
+		"ttl": {
+			Type:        framework.TypeInt,
+			Description: "Token TTL in seconds associated with this role.",
+		},
+		"max_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Maximum token TTL in seconds associated with this role.",
+		},
+		"period": {
+			Type:        framework.TypeInt,
+			Description: "Token period in seconds associated with this role.",
+		},
+		"bound_cidrs": {
+			Type:        framework.TypeSlice,
+			Description: "CIDR blocks associated with this role.",
+		},
+		"token_bound_cidrs": {
+			Type:        framework.TypeSlice,
+			Description: "CIDR blocks bound to tokens issued by this role.",
+		},
+		"token_explicit_max_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Explicit maximum token TTL in seconds associated with this role.",
+		},
+		"token_max_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Maximum token TTL in seconds associated with this role.",
+		},
+		"token_no_default_policy": {
+			Type:        framework.TypeBool,
+			Description: "Whether tokens issued by this role omit the default policy.",
+		},
+		"token_period": {
+			Type:        framework.TypeInt,
+			Description: "Token period in seconds associated with this role.",
+		},
+		"token_policies": {
+			Type:        framework.TypeSlice,
+			Description: "Token policies associated with this role.",
+		},
+		"token_type": {
+			Type:        framework.TypeString,
+			Description: "Token type issued by this role.",
+		},
+		"token_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Token TTL in seconds associated with this role.",
+		},
+		"token_num_uses": {
+			Type:        framework.TypeInt,
+			Description: "Number of permitted uses for tokens issued by this role.",
+		},
+		"alias_metadata": {
+			Type:        framework.TypeMap,
+			Description: "Alias metadata associated with tokens issued by this role.",
+		},
+	}
+
 	p := &framework.Path{
 		Pattern: "role/" + framework.GenericNameRegex("role"),
 		DisplayAttrs: &framework.DisplayAttributes{
@@ -56,11 +123,35 @@ func pathRole(b *backend) *framework.Path {
 			},
 		},
 		ExistenceCheck: b.operationRoleExistenceCheck,
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.CreateOperation: b.operationRoleCreateUpdate,
-			logical.UpdateOperation: b.operationRoleCreateUpdate,
-			logical.ReadOperation:   b.operationRoleRead,
-			logical.DeleteOperation: b.operationRoleDelete,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.CreateOperation: &framework.PathOperation{
+				Summary:  "Create a role.",
+				Callback: b.operationRoleCreateUpdate,
+				Responses: map[int][]framework.Response{
+					204: {{Description: "No content."}},
+				},
+			},
+			logical.UpdateOperation: &framework.PathOperation{
+				Summary:  "Update a role.",
+				Callback: b.operationRoleCreateUpdate,
+				Responses: map[int][]framework.Response{
+					204: {{Description: "No content."}},
+				},
+			},
+			logical.ReadOperation: &framework.PathOperation{
+				Summary:  "Read a role.",
+				Callback: b.operationRoleRead,
+				Responses: map[int][]framework.Response{
+					200: {{Description: "OK", Fields: roleResponseFields}},
+				},
+			},
+			logical.DeleteOperation: &framework.PathOperation{
+				Summary:  "Delete a role.",
+				Callback: b.operationRoleDelete,
+				Responses: map[int][]framework.Response{
+					204: {{Description: "No content."}},
+				},
+			},
 		},
 		HelpSynopsis:    pathRoleSyn,
 		HelpDescription: pathRoleDesc,
@@ -78,8 +169,22 @@ func pathListRole(b *backend) *framework.Path {
 			OperationVerb:   "list",
 			OperationSuffix: "auth-roles",
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ListOperation: b.operationRoleList,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.ListOperation: &framework.PathOperation{
+				Summary:  "List all roles.",
+				Callback: b.operationRoleList,
+				Responses: map[int][]framework.Response{
+					200: {{
+						Description: "OK",
+						Fields: map[string]*framework.FieldSchema{
+							"keys": {
+								Type:        framework.TypeSlice,
+								Description: "Role names.",
+							},
+						},
+					}},
+				},
+			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
 		HelpDescription: pathListRolesHelpDesc,
@@ -94,8 +199,22 @@ func pathListRoles(b *backend) *framework.Path {
 			OperationVerb:   "list",
 			OperationSuffix: "auth-roles2",
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ListOperation: b.operationRoleList,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.ListOperation: &framework.PathOperation{
+				Summary:  "List all roles.",
+				Callback: b.operationRoleList,
+				Responses: map[int][]framework.Response{
+					200: {{
+						Description: "OK",
+						Fields: map[string]*framework.FieldSchema{
+							"keys": {
+								Type:        framework.TypeSlice,
+								Description: "Role names.",
+							},
+						},
+					}},
+				},
+			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
 		HelpDescription: pathListRolesHelpDesc,
