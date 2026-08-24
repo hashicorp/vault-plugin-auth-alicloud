@@ -56,10 +56,6 @@ has included a signature.`,
 					}},
 				},
 			},
-			// ResolveRoleOperation is an internal Vault operation used by the MFA
-			// subsystem to determine the role without completing a full login.
-			// It is not exposed in the public OpenAPI spec and does not carry
-			// Summary or Responses metadata.
 			logical.ResolveRoleOperation: &framework.PathOperation{
 				Callback: b.pathLoginResolveRole,
 			},
