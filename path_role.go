@@ -90,17 +90,6 @@ func responseFieldsRole() map[string]*framework.FieldSchema {
 	}
 }
 
-// responseFieldsRoleList returns the response schema for list role operations.
-// Shared between pathListRole and pathListRoles, which both call operationRoleList.
-func responseFieldsRoleList() map[string]*framework.FieldSchema {
-	return map[string]*framework.FieldSchema{
-		"keys": {
-			Type:        framework.TypeSlice,
-			Description: "Role names.",
-		},
-	}
-}
-
 func pathRole(b *backend) *framework.Path {
 	p := &framework.Path{
 		Pattern: "role/" + framework.GenericNameRegex("role"),
@@ -198,9 +187,9 @@ func pathListRole(b *backend) *framework.Path {
 			logical.ListOperation: &framework.PathOperation{
 				Summary:  "List all AliCloud auth roles.",
 				Callback: b.operationRoleList,
-				Responses: map[int][]framework.Response{
-					200: {{Description: "OK", Fields: responseFieldsRoleList()}},
-				},
+				// No Responses set — the SDK automatically injects OASStdRespListOK
+				// (the shared StandardListResponse schema with a "keys" array) for
+				// any ListOperation whose Responses map is empty.
 			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
@@ -220,9 +209,7 @@ func pathListRoles(b *backend) *framework.Path {
 			logical.ListOperation: &framework.PathOperation{
 				Summary:  "List all AliCloud auth roles.",
 				Callback: b.operationRoleList,
-				Responses: map[int][]framework.Response{
-					200: {{Description: "OK", Fields: responseFieldsRoleList()}},
-				},
+				// No Responses set — same as above; SDK injects OASStdRespListOK.
 			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
