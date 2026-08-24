@@ -52,73 +52,16 @@ has included a signature.`,
 				Responses: map[int][]framework.Response{
 					200: {{
 						Description: "OK",
-						Fields: map[string]*framework.FieldSchema{
-							"client_token": {
-								Type:        framework.TypeString,
-								Description: "Token used for authenticated requests.",
-							},
-							"accessor": {
-								Type:        framework.TypeString,
-								Description: "Accessor for the issued token.",
-							},
-							"policies": {
-								Type:        framework.TypeSlice,
-								Description: "Policies associated with the issued token.",
-							},
-							"token_policies": {
-								Type:        framework.TypeSlice,
-								Description: "Token policies associated with the issued token.",
-							},
-							"metadata": {
-								Type:        framework.TypeMap,
-								Description: "Metadata associated with the issued token, including account_id, user_id, role_id, arn, identity_type, principal_id, request_id, and role_name.",
-							},
-							"lease_duration": {
-								Type:        framework.TypeInt,
-								Description: "Lease duration of the issued token in seconds.",
-							},
-							"renewable": {
-								Type:        framework.TypeBool,
-								Description: "Whether the issued token is renewable.",
-							},
-							"entity_id": {
-								Type:        framework.TypeString,
-								Description: "Entity ID associated with the issued token.",
-							},
-							"token_type": {
-								Type:        framework.TypeString,
-								Description: "Token type issued by this login.",
-							},
-							"orphan": {
-								Type:        framework.TypeBool,
-								Description: "Whether the issued token is an orphan token.",
-							},
-							"mfa_requirement": {
-								Type:        framework.TypeMap,
-								Description: "MFA requirements associated with the issued token.",
-							},
-							"num_uses": {
-								Type:        framework.TypeInt,
-								Description: "Number of permitted uses for the issued token.",
-							},
-						},
+						Fields:      framework.AuthLoginResponseFields(),
 					}},
 				},
 			},
+			// ResolveRoleOperation is an internal Vault operation used by the MFA
+			// subsystem to determine the role without completing a full login.
+			// It is not exposed in the public OpenAPI spec and does not carry
+			// Summary or Responses metadata.
 			logical.ResolveRoleOperation: &framework.PathOperation{
-				Summary:  "Resolve the role used for login.",
 				Callback: b.pathLoginResolveRole,
-				Responses: map[int][]framework.Response{
-					200: {{
-						Description: "OK",
-						Fields: map[string]*framework.FieldSchema{
-							"role": {
-								Type:        framework.TypeString,
-								Description: "Resolved role name.",
-							},
-						},
-					}},
-				},
 			},
 		},
 		HelpSynopsis:    pathLoginSyn,
@@ -354,9 +297,7 @@ func getSTSEndpoint(regionID string) (string, error) {
 	return endpoint, nil
 }
 
-const pathLoginSyn = `
-Authenticates an RAM entity with Vault.
-`
+const pathLoginSyn = "Authenticate an AliCloud RAM entity with Vault."
 
 const pathLoginDesc = `
 Authenticate AliCloud entities using an arbitrary RAM principal.
