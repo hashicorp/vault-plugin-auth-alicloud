@@ -45,9 +45,20 @@ If a matching role is not found, login fails.`,
 has included a signature.`,
 			},
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation:      b.pathLoginUpdate,
-			logical.ResolveRoleOperation: b.pathLoginResolveRole,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.UpdateOperation: &framework.PathOperation{
+				Summary:  "Authenticate with AliCloud.",
+				Callback: b.pathLoginUpdate,
+				Responses: map[int][]framework.Response{
+					200: {{
+						Description: "OK",
+						Fields:      framework.AuthLoginResponseFields(),
+					}},
+				},
+			},
+			logical.ResolveRoleOperation: &framework.PathOperation{
+				Callback: b.pathLoginResolveRole,
+			},
 		},
 		HelpSynopsis:    pathLoginSyn,
 		HelpDescription: pathLoginDesc,
@@ -282,9 +293,7 @@ func getSTSEndpoint(regionID string) (string, error) {
 	return endpoint, nil
 }
 
-const pathLoginSyn = `
-Authenticates an RAM entity with Vault.
-`
+const pathLoginSyn = "Authenticate an AliCloud RAM entity with Vault."
 
 const pathLoginDesc = `
 Authenticate AliCloud entities using an arbitrary RAM principal.

@@ -13,6 +13,83 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
+// responseFieldsRole returns the response schema for a role read operation.
+// Defined as a function so each call site receives its own map instance and
+// the schema is not shared or mutated across calls.
+func responseFieldsRole() map[string]*framework.FieldSchema {
+	return map[string]*framework.FieldSchema{
+		"arn": {
+			Type:        framework.TypeString,
+			Description: "ARN of the RAM role bound to this role.",
+		},
+		"policies": {
+			Type:        framework.TypeSlice,
+			Description: tokenutil.DeprecationText("token_policies"),
+			Deprecated:  true,
+		},
+		"ttl": {
+			Type:        framework.TypeInt,
+			Description: tokenutil.DeprecationText("token_ttl"),
+			Deprecated:  true,
+		},
+		"max_ttl": {
+			Type:        framework.TypeInt,
+			Description: tokenutil.DeprecationText("token_max_ttl"),
+			Deprecated:  true,
+		},
+		"period": {
+			Type:        framework.TypeInt,
+			Description: tokenutil.DeprecationText("token_period"),
+			Deprecated:  true,
+		},
+		"bound_cidrs": {
+			Type:        framework.TypeSlice,
+			Description: tokenutil.DeprecationText("token_bound_cidrs"),
+			Deprecated:  true,
+		},
+		"token_bound_cidrs": {
+			Type:        framework.TypeSlice,
+			Description: "CIDR blocks bound to tokens issued by this role.",
+		},
+		"token_explicit_max_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Explicit maximum token TTL in seconds associated with this role.",
+		},
+		"token_max_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Maximum token TTL in seconds associated with this role.",
+		},
+		"token_no_default_policy": {
+			Type:        framework.TypeBool,
+			Description: "Whether tokens issued by this role omit the default policy.",
+		},
+		"token_period": {
+			Type:        framework.TypeInt,
+			Description: "Token period in seconds associated with this role.",
+		},
+		"token_policies": {
+			Type:        framework.TypeSlice,
+			Description: "Token policies associated with this role.",
+		},
+		"token_type": {
+			Type:        framework.TypeString,
+			Description: "Token type issued by this role.",
+		},
+		"token_ttl": {
+			Type:        framework.TypeInt,
+			Description: "Token TTL in seconds associated with this role.",
+		},
+		"token_num_uses": {
+			Type:        framework.TypeInt,
+			Description: "Number of permitted uses for tokens issued by this role.",
+		},
+		"alias_metadata": {
+			Type:        framework.TypeKVPairs,
+			Description: "Alias metadata associated with tokens issued by this role.",
+		},
+	}
+}
+
 func pathRole(b *backend) *framework.Path {
 	p := &framework.Path{
 		Pattern: "role/" + framework.GenericNameRegex("role"),
@@ -56,11 +133,39 @@ func pathRole(b *backend) *framework.Path {
 			},
 		},
 		ExistenceCheck: b.operationRoleExistenceCheck,
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.CreateOperation: b.operationRoleCreateUpdate,
-			logical.UpdateOperation: b.operationRoleCreateUpdate,
-			logical.ReadOperation:   b.operationRoleRead,
-			logical.DeleteOperation: b.operationRoleDelete,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.CreateOperation: &framework.PathOperation{
+				Summary:  "Create an AliCloud auth role.",
+				Callback: b.operationRoleCreateUpdate,
+				Responses: map[int][]framework.Response{
+					// 200 is returned when TTL exceeds the system max TTL and a warning is emitted.
+					200: {{Description: "OK"}},
+					204: {{Description: "No content."}},
+				},
+			},
+			logical.UpdateOperation: &framework.PathOperation{
+				Summary:  "Update an AliCloud auth role.",
+				Callback: b.operationRoleCreateUpdate,
+				Responses: map[int][]framework.Response{
+					// 200 is returned when TTL exceeds the system max TTL and a warning is emitted.
+					200: {{Description: "OK"}},
+					204: {{Description: "No content."}},
+				},
+			},
+			logical.ReadOperation: &framework.PathOperation{
+				Summary:  "Read an AliCloud auth role.",
+				Callback: b.operationRoleRead,
+				Responses: map[int][]framework.Response{
+					200: {{Description: "OK", Fields: responseFieldsRole()}},
+				},
+			},
+			logical.DeleteOperation: &framework.PathOperation{
+				Summary:  "Delete an AliCloud auth role.",
+				Callback: b.operationRoleDelete,
+				Responses: map[int][]framework.Response{
+					204: {{Description: "No content."}},
+				},
+			},
 		},
 		HelpSynopsis:    pathRoleSyn,
 		HelpDescription: pathRoleDesc,
@@ -78,8 +183,14 @@ func pathListRole(b *backend) *framework.Path {
 			OperationVerb:   "list",
 			OperationSuffix: "auth-roles",
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ListOperation: b.operationRoleList,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.ListOperation: &framework.PathOperation{
+				Summary:  "List all AliCloud auth roles.",
+				Callback: b.operationRoleList,
+				// No Responses set — the SDK automatically injects OASStdRespListOK
+				// (the shared StandardListResponse schema with a "keys" array) for
+				// any ListOperation whose Responses map is empty.
+			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
 		HelpDescription: pathListRolesHelpDesc,
@@ -94,8 +205,12 @@ func pathListRoles(b *backend) *framework.Path {
 			OperationVerb:   "list",
 			OperationSuffix: "auth-roles2",
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ListOperation: b.operationRoleList,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.ListOperation: &framework.PathOperation{
+				Summary:  "List all AliCloud auth roles.",
+				Callback: b.operationRoleList,
+				// No Responses set — same as above; SDK injects OASStdRespListOK.
+			},
 		},
 		HelpSynopsis:    pathListRolesHelpSyn,
 		HelpDescription: pathListRolesHelpDesc,
@@ -246,9 +361,7 @@ func readRole(ctx context.Context, s logical.Storage, roleName string) (*roleEnt
 	return result, nil
 }
 
-const pathRoleSyn = `
-Create a role and associate policies to it.
-`
+const pathRoleSyn = "Create an AliCloud auth role and associate policies to it."
 
 const pathRoleDesc = `
 A precondition for login is that a role should be created in the backend.
@@ -262,9 +375,7 @@ duration for which a login can be renewed. Note that the 'max_ttl' has an upper
 limit of the 'max_ttl' value on the backend's mount. The same applies to the 'ttl'.
 `
 
-const pathListRolesHelpSyn = `
-Lists all the roles that are registered with Vault.
-`
+const pathListRolesHelpSyn = "List all AliCloud auth roles registered with Vault."
 
 const pathListRolesHelpDesc = `
 Roles will be listed by their respective role names.
