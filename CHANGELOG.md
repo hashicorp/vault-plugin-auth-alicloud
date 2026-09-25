@@ -1,5 +1,13 @@
 ## Unreleased
 
+## v0.24.0
+### September 25, 2026
+
+* VAULT-50075: chore: upgrade vault/sdk to v0.26.0 (#163)
+* VAULT-50075: chore: automated Go/dependency update via vault-plugin-release (#162)
+* Added missing OpenAPI metadata to the API endpoints (#161)
+* update dependencies to address secvuln (#160)
+
 ## v0.23.1
 ### March 18, 2028
 
