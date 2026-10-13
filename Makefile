@@ -47,14 +47,4 @@ fmt:
 proto:
 	protoc *.proto --go_out=plugins=grpc:.
 
-# version prints the product version from version/VERSION (used by CRT).
-version:
-	@cat $(CURDIR)/version/VERSION
-
-# crt-build builds a release binary; invoked by hashicorp/actions-go-build in
-# .github/workflows/build.yml, which provides BIN_PATH and TARGET_DIR.
-crt-build:
-	@$(CURDIR)/scripts/crt-build.sh build
-	@cp $(CURDIR)/LICENSE $(TARGET_DIR)/LICENSE.txt
-
-.PHONY: bin default generate test vet fmt fmtcheck version crt-build
+.PHONY: bin default generate test vet fmt fmtcheck
