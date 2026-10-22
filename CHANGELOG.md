@@ -1,3 +1,9 @@
+## v0.24.1
+### October 22, 2026
+
+* update dependencies to resolve security vulnerabilities (#166)
+* [CHANGELOG] Prepare for v0.24.0 release (#164)
+
 ## Unreleased
 
 ## v0.24.0
