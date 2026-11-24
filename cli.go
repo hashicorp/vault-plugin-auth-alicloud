@@ -13,7 +13,10 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-type CLIHandler struct{}
+type CLIHandler struct {
+	// BinaryName is the executable shown in help. It defaults to "vault".
+	BinaryName string
+}
 
 func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, error) {
 	mount, ok := m["mount"]
@@ -54,15 +57,20 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string) (*api.Secret, erro
 }
 
 func (h *CLIHandler) Help() string {
+	binaryName := h.BinaryName
+	if binaryName == "" {
+		binaryName = "vault"
+	}
+
 	help := `
-Usage: vault login -method=alicloud [CONFIG K=V...]
+Usage: ` + binaryName + ` login -method=alicloud [CONFIG K=V...]
 
   The AliCloud auth method allows users to authenticate with AliCloud RAM
   credentials.
 
   The AliCloud RAM credentials may be specified explicitly via the command line:
 
-      $ vault login -method=alicloud access_key=... secret_key=... security_token=... region=...
+      $ ` + binaryName + ` login -method=alicloud access_key=... secret_key=... security_token=... region=...
 
 Configuration:
 
@@ -80,7 +88,7 @@ Configuration:
 
   mount=<string>
       Path where the AliCloud credential method is mounted. This is usually provided
-      via the -path flag in the "vault login" command, but it can be specified
+      via the -path flag in the "` + binaryName + ` login" command, but it can be specified
       here as well. If specified here, it takes precedence over the value for
       -path. The default value is "alicloud".
 
